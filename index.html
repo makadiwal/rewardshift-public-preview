@@ -1,0 +1,4339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Fulfillment Number™</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<!-- Classic script runs synchronously — creates the _fbReady promise BEFORE
+     the module script or any deferred code runs, so loadDash() can always await it -->
+<script>
+var _fbReadyResolve;
+window._fbReady = new Promise(function(res) { _fbReadyResolve = res; });
+window._fbReadyResolve = _fbReadyResolve;
+</script>
+<script type="module">
+// ═══════════════════════════════════════════
+//  FIREBASE INIT
+// ═══════════════════════════════════════════
+import { initializeApp }                           from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
+import { getAuth, signInAnonymously }              from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js';
+import { getFirestore, doc, getDoc, setDoc,
+         updateDoc, increment, collection,
+         query, orderBy, limit, getDocs }          from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyCnWptI1-dnK7Wd6uua7ibotqQKeiPNbSc",
+  authDomain:        "the-fulfillment-number.firebaseapp.com",
+  projectId:         "the-fulfillment-number",
+  storageBucket:     "the-fulfillment-number.firebasestorage.app",
+  messagingSenderId: "583607184614",
+  appId:             "1:583607184614:web:4d5e21a53170febf345f27"
+};
+
+const fbApp  = initializeApp(firebaseConfig);
+const fbAuth = getAuth(fbApp);
+const db     = getFirestore(fbApp);
+
+let fbUid = null;
+signInAnonymously(fbAuth)
+  .then(cred => { fbUid = cred.user.uid; })
+  .catch(() => {});
+
+// Expose Firebase helpers to the main script
+window._fb = {
+  db,
+  doc, getDoc, setDoc, updateDoc, increment,
+  collection, query, orderBy, limit, getDocs,
+  uid: () => fbUid,
+};
+
+// Resolve the _fbReady promise — _fb is now fully populated
+window._fbReadyResolve();
+</script>
+<style>
+:root {
+  --bg: #08080e;
+  --surface: #0e0e18;
+  --s2: #141420;
+  --s3: #1a1a28;
+  --border: #222234;
+  --border2: #2c2c42;
+  --gold: #c8a84b;
+  --gold-l: #e6c96a;
+  --gold-d: rgba(200,168,75,0.13);
+  --gold-b: rgba(200,168,75,0.28);
+  --ess: #4a9fd4;
+  --ess-d: rgba(74,159,212,0.1);
+  --ess-b: rgba(74,159,212,0.28);
+  --pct-budget: #56c4b8;       /* teal — % of total budget */
+  --pct-budget-d: rgba(86,196,184,0.12);
+  --pct-ess: #c47a56;          /* warm amber — % of category that is essential */
+  --pct-ess-d: rgba(196,122,86,0.12);
+  --stab: #e05c5c;
+  --stab-d: rgba(224,92,92,0.1);
+  --build: #4a9fd4;
+  --build-d: rgba(74,159,212,0.1);
+  --auto: #4caf82;
+  --auto-d: rgba(76,175,130,0.1);
+  --text: #ede9e3;
+  --muted: #7878a0;
+  --dim: #3e3e58;
+  --red: #e05c5c;
+  --green: #4caf82;
+  --r: 14px;
+  --rs: 9px;
+  --sidebar: 260px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 300;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 10% 0%, rgba(200,168,75,0.06) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 70% at 90% 100%, rgba(74,159,212,0.04) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── PAGE LAYOUT ── */
+.page-outer {
+  position: relative;
+  z-index: 1;
+}
+.page-layout {
+  display: flex;
+  align-items: flex-start;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 22px;
+}
+.main-col {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar-col {
+  display: none;
+  width: var(--sidebar);
+  flex-shrink: 0;
+  padding-left: 24px;
+  position: sticky;
+  top: 24px;
+}
+@media (min-width: 1200px) {
+  .page-layout {
+    max-width: calc(900px + var(--sidebar) + 24px);
+    padding: 0 22px;
+  }
+  .sidebar-col.active {
+    display: block;
+  }
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 5%, var(--gold) 50%, transparent 95%);
+  opacity: .22;
+}
+.sb-header {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.sb-row {
+  margin-bottom: 14px;
+}
+.sb-row:last-child { margin-bottom: 0; }
+.sb-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 7.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.sb-value {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.55rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: all 0.35s ease;
+}
+.sb-value.e  { color: var(--ess); }
+.sb-value.o  { color: var(--gold-l); }
+.sb-value.g  { color: var(--muted); }
+.sb-value.i  { color: var(--text); }
+.sb-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+.sb-phase-badge {
+  display: inline-block;
+  font-family: 'DM Mono', monospace;
+  font-size: 7.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+  margin-top: 2px;
+}
+.sb-phase-badge.stab { background: var(--stab-d); color: var(--stab); border: 1px solid rgba(224,92,92,.25); }
+.sb-phase-badge.build { background: var(--build-d); color: var(--build); border: 1px solid rgba(74,159,212,.25); }
+.sb-phase-badge.auto { background: var(--auto-d); color: var(--auto); border: 1px solid rgba(76,175,130,.25); }
+.sb-phase-badge.none { background: var(--s2); color: var(--dim); border: 1px solid var(--border); }
+.sb-top-cat-name {
+  font-size: .8rem;
+  color: var(--text);
+  margin-bottom: 1px;
+}
+.sb-top-cat-val {
+  font-family: 'DM Mono', monospace;
+  font-size: .72rem;
+  color: var(--muted);
+}
+
+/* ── MOBILE STICKY BAR ── */
+.mobile-bar {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 9px 18px;
+  z-index: 100;
+  gap: 0;
+}
+.mobile-bar.active { display: flex; }
+.mb-item { flex: 1; text-align: center; }
+.mb-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 7px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1px;
+}
+.mb-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.mb-val.e { color: var(--ess); }
+.mb-val.o { color: var(--gold-l); }
+.mb-val.g { color: var(--muted); }
+.mb-sep { width: 1px; background: var(--border); margin: 0 8px; }
+@media (min-width: 1200px) {
+  .mobile-bar { display: none !important; }
+}
+@media (max-width: 1199px) {
+  .mobile-bar.active { display: flex; }
+  body.has-bar { padding-bottom: 58px; }
+}
+
+/* ── HEADER ── */
+header {
+  padding: 56px 0 30px;
+  text-align: center;
+  animation: fD .8s ease both;
+}
+.brand-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid var(--gold-b);
+  border-radius: 30px;
+  padding: 5px 15px;
+  margin-bottom: 24px;
+}
+.brand-pill::before { content: '◆'; font-size: 6px; }
+h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(3rem, 8vw, 5.5rem);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -1px;
+  background: linear-gradient(150deg, #ede9e3 25%, var(--gold-l) 85%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 16px;
+}
+.tagline {
+  font-size: 1rem;
+  color: var(--muted);
+  max-width: 500px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* ── PROGRESS ── */
+.prog {
+  margin: 42px 0 32px;
+  animation: fD .8s .12s ease both;
+}
+.prog-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 11px;
+}
+.dot {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  background: var(--s2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--dim);
+  transition: all .35s;
+  flex-shrink: 0;
+}
+.dot.on  { border-color: var(--gold); color: var(--gold); background: var(--gold-d); box-shadow: 0 0 20px rgba(200,168,75,.16); }
+.dot.done{ border-color: var(--green); background: rgba(76,175,130,.12); color: var(--green); }
+.line {
+  flex: 1; height: 1px;
+  background: var(--border);
+  max-width: 58px;
+  transition: background .35s;
+}
+.line.done { background: var(--green); }
+.prog-lbl {
+  text-align: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 2.5px;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 38px 42px;
+  margin-bottom: 22px;
+  position: relative;
+  overflow: hidden;
+  animation: fU .45s ease both;
+}
+.card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 5%, var(--gold) 50%, transparent 95%);
+  opacity: .28;
+}
+.card-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-bottom: 7px;
+  line-height: 1.1;
+}
+.card-sub {
+  font-size: .86rem;
+  color: var(--muted);
+  margin-bottom: 30px;
+  line-height: 1.6;
+}
+
+/* ── QUIZ ── */
+.quiz-q {
+  font-size: .93rem;
+  font-weight: 400;
+  color: var(--muted);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.quiz-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.qopt {
+  padding: 12px 15px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--rs);
+  background: var(--s2);
+  cursor: pointer;
+  font-size: .82rem;
+  color: var(--muted);
+  transition: all .2s;
+  text-align: left;
+  line-height: 1.35;
+  font-family: 'DM Sans', sans-serif;
+}
+.qopt:hover { border-color: var(--gold); color: var(--text); background: var(--gold-d); }
+.qopt.sel   { border-color: var(--gold); background: var(--gold-d); color: var(--gold-l); }
+
+/* ── SECTION HEADER ── */
+.sec-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  margin-top: 26px;
+}
+.sec-hdr:first-child { margin-top: 0; }
+.sec-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+/* badges removed — section titles stand alone */
+
+/* ── DUAL FIELD LAYOUT ── */
+.fields-list { display: flex; flex-direction: column; gap: 12px; }
+.field-item {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 14px 16px;
+  animation: fU .3s ease both;
+}
+.field-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.field-label { font-size: .82rem; color: var(--text); font-weight: 400; }
+.del-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--dim);
+  font-size: 12px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  transition: color .2s, background .2s;
+  line-height: 1;
+}
+.del-btn:hover { color: var(--red); background: rgba(224,92,92,.1); }
+.dual-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.inp-col { display: flex; flex-direction: column; gap: 5px; }
+.inp-lbl {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.inp-lbl.e-lbl { color: var(--ess); }
+.inp-lbl.o-lbl { color: var(--gold); }
+.inp-wrap { position: relative; }
+.inp-pfx {
+  position: absolute;
+  left: 11px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--dim);
+  font-family: 'DM Mono', monospace;
+  font-size: .82rem;
+  pointer-events: none;
+}
+input[type=number] {
+  width: 100%;
+  background: var(--s3);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 10px 10px 24px;
+  font-family: 'DM Mono', monospace;
+  font-size: .84rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  -moz-appearance: textfield;
+}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+input[type=number].e-inp:focus { border-color: var(--ess); box-shadow: 0 0 0 3px rgba(74,159,212,.09); }
+input[type=number].o-inp:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,168,75,.09); }
+input[type=number].o-warn {
+  border-color: var(--red) !important;
+  box-shadow: 0 0 0 3px rgba(224,92,92,.18) !important;
+  animation: warnPulse .4s ease;
+}
+@keyframes warnPulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+/* same-toggle removed */
+
+/* ── ADD ITEM ── */
+.add-wrap { margin-top: 14px; }
+.add-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 15px;
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--rs);
+  background: transparent;
+  color: var(--dim);
+  font-size: .81rem;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: 'DM Sans', sans-serif;
+}
+.add-btn:hover { border-color: var(--gold); color: var(--gold); background: var(--gold-d); }
+.add-panel {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  padding: 18px 20px;
+  margin-top: 10px;
+  display: none;
+}
+.add-panel.open { display: block; animation: fU .25s ease both; }
+.ap-title {
+  font-size: .79rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+  line-height: 1.55;
+}
+.ap-name { margin-bottom: 10px; }
+.ap-dual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.ap-dual-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+input[type=text] {
+  width: 100%;
+  background: var(--s3);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: .84rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color .2s;
+}
+input[type=text]::placeholder { color: var(--dim); }
+input[type=text]:focus { border-color: var(--gold); }
+input[type=text].err { border-color: var(--red); }
+.freq-row { display: flex; }
+.freq-inp {
+  border-radius: 7px 0 0 7px !important;
+  flex: 1;
+}
+select.freq-sel {
+  background: var(--s3);
+  border: 1.5px solid var(--border);
+  border-left: none;
+  border-radius: 0 7px 7px 0;
+  padding: 0 9px;
+  font-family: 'DM Mono', monospace;
+  font-size: .73rem;
+  color: var(--muted);
+  cursor: pointer;
+  outline: none;
+  min-width: 72px;
+}
+.ap-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.ap-confirm {
+  padding: 9px 20px;
+  border-radius: 7px;
+  border: none;
+  background: linear-gradient(135deg, var(--gold), #8a5e18);
+  color: #060610;
+  font-family: 'DM Sans', sans-serif;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s;
+}
+.ap-confirm:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(200,168,75,.25); }
+.ap-cancel {
+  padding: 9px 15px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  font-size: .82rem;
+  cursor: pointer;
+  transition: all .2s;
+}
+.ap-cancel:hover { border-color: var(--red); color: var(--red); }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border-radius: var(--rs);
+  font-family: 'DM Sans', sans-serif;
+  font-size: .88rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all .22s;
+}
+.btn-p { background: linear-gradient(135deg, var(--gold), #8a5e18); color: #060610; font-weight: 700; }
+.btn-p:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(200,168,75,.28); }
+.btn-s { background: var(--s2); color: var(--muted); border: 1px solid var(--border); }
+.btn-s:hover { border-color: var(--gold); color: var(--text); }
+.btn-row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 28px;
+}
+.divider { height: 1px; background: var(--border); margin: 8px 0; }
+.info-box {
+  background: var(--gold-d);
+  border: 1px solid rgba(200,168,75,.18);
+  border-radius: var(--rs);
+  padding: 13px 16px;
+  font-size: .82rem;
+  color: var(--muted);
+  margin-bottom: 24px;
+  line-height: 1.65;
+}
+.info-box strong { color: var(--gold-l); font-weight: 500; }
+
+/* ── RESULTS ── */
+.period-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.ptog {
+  display: flex;
+  background: var(--s2);
+  border-radius: 8px;
+  padding: 4px;
+  border: 1px solid var(--border);
+}
+.ptog button {
+  padding: 7px 18px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .77rem;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: .8px;
+}
+.ptog button.on { background: var(--gold-d); color: var(--gold-l); border: 1px solid rgba(200,168,75,.25); }
+
+/* THREE NUMBERS */
+.three-nums {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.num-card {
+  padding: 24px 18px;
+  border-radius: 12px;
+  border: 1.5px solid;
+  text-align: center;
+}
+.num-card.income  { border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.03); }
+.num-card.ess     { border-color: var(--ess-b); background: var(--ess-d); }
+.num-card.opt     { border-color: var(--gold-b); background: var(--gold-d); }
+.nc-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 9px;
+}
+.num-card.income .nc-label { color: var(--muted); }
+.num-card.ess    .nc-label { color: var(--ess); }
+.num-card.opt    .nc-label { color: var(--gold); }
+.nc-amount {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.num-card.income .nc-amount { color: var(--text); }
+.num-card.ess    .nc-amount { color: var(--ess); }
+.num-card.opt    .nc-amount { color: var(--gold-l); }
+.nc-period { font-size: .7rem; color: var(--dim); font-family: 'DM Mono', monospace; }
+.nc-sub    { margin-top: 5px; font-size: .75rem; color: var(--muted); }
+
+/* INCOME INPUT */
+.income-input-section {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  padding: 22px 24px;
+  margin-bottom: 28px;
+}
+.income-label {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.income-help {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-bottom: 16px;
+  line-height: 1.65;
+}
+.income-help strong { color: var(--gold-l); font-weight: 500; }
+.income-inp-row { display: flex; gap: 12px; align-items: center; }
+.income-inp-wrap { flex: 1; position: relative; }
+.income-pfx {
+  position: absolute;
+  left: 14px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 1rem;
+}
+input#incomeInput {
+  width: 100%;
+  background: var(--s3);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--rs);
+  padding: 14px 14px 14px 30px;
+  font-family: 'DM Mono', monospace;
+  font-size: 1.1rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  -moz-appearance: textfield;
+}
+input#incomeInput::-webkit-outer-spin-button,
+input#incomeInput::-webkit-inner-spin-button { -webkit-appearance: none; }
+input#incomeInput:focus { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(200,168,75,.1); }
+.income-freq {
+  background: var(--s3);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--rs);
+  padding: 0 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: .8rem;
+  color: var(--muted);
+  cursor: pointer;
+  outline: none;
+  height: 50px;
+}
+
+/* AUTONOMY SCORE CARD */
+.ascore-card {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  padding: 28px 24px 24px;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.ascore-circle-wrap {
+  flex-shrink: 0;
+  position: relative;
+  width: 110px;
+  height: 110px;
+}
+.ascore-svg {
+  width: 110px;
+  height: 110px;
+  transform: rotate(-90deg);
+}
+.ascore-track {
+  fill: none;
+  stroke: var(--border2);
+  stroke-width: 7;
+}
+.ascore-fill {
+  fill: none;
+  stroke-width: 7;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1);
+}
+.ascore-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.ascore-num {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+.ascore-denom {
+  font-family: 'DM Mono', monospace;
+  font-size: .6rem;
+  color: var(--dim);
+  letter-spacing: 1px;
+}
+.ascore-right {
+  flex: 1;
+  min-width: 180px;
+}
+.ascore-label {
+  font-family: 'DM Mono', monospace;
+  font-size: .65rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.ascore-desc {
+  font-size: .85rem;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.ascore-desc strong { color: var(--text); font-weight: 500; }
+.ascore-scale {
+  display: flex;
+  align-items: center;
+  font-family: 'DM Mono', monospace;
+  font-size: .62rem;
+  color: var(--dim);
+}
+.ascore-scale-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--stab), var(--build), var(--auto));
+  margin: 0 8px;
+  position: relative;
+}
+.ascore-scale-marker {
+  position: absolute;
+  top: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 2px solid var(--bg);
+  transform: translateX(-50%);
+  transition: left 1.2s cubic-bezier(.4,0,.2,1);
+}
+
+/* PHASE CARD */
+.phase-card {
+  border-radius: var(--r);
+  padding: 26px 30px;
+  margin-bottom: 28px;
+  border: 1.5px solid;
+  position: relative;
+}
+.phase-card.stab  { background: var(--stab-d);  border-color: rgba(224,92,92,.3); }
+.phase-card.build { background: var(--build-d); border-color: rgba(74,159,212,.3); }
+.phase-card.auto  { background: var(--auto-d);  border-color: rgba(76,175,130,.3); }
+.phase-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+.phase-card.stab  .phase-badge { background: rgba(224,92,92,.12);  color: var(--stab);  border: 1px solid rgba(224,92,92,.25); }
+.phase-card.build .phase-badge { background: rgba(74,159,212,.12); color: var(--build); border: 1px solid rgba(74,159,212,.25); }
+.phase-card.auto  .phase-badge { background: rgba(76,175,130,.12); color: var(--auto);  border: 1px solid rgba(76,175,130,.25); }
+.phase-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.phase-card.stab  .phase-title { color: var(--stab); }
+.phase-card.build .phase-title { color: var(--build); }
+.phase-card.auto  .phase-title { color: var(--auto); }
+.phase-text {
+  font-size: .86rem;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 16px;
+}
+.phase-text strong { color: var(--text); font-weight: 500; }
+.focus-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.focus-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,.03);
+  border-radius: 7px;
+  font-size: .78rem;
+  color: var(--muted);
+}
+.focus-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.stab  .focus-dot { background: var(--stab); }
+.build .focus-dot { background: var(--build); }
+.auto  .focus-dot { background: var(--auto); }
+
+/* NEXT MOVE */
+.next-move {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 22px 26px;
+  margin-bottom: 28px;
+}
+.nm-hdr {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gold);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.nm-target-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.nm-target-val {
+  font-size: .84rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.nm-target-val strong { color: var(--text); font-weight: 500; }
+.nm-req-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.nm-req-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--gold-l);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.nm-req-sub {
+  font-size: .78rem;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+.nm-levers { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.nm-lever {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: .8rem;
+  color: var(--muted);
+  padding: 8px 12px;
+  background: rgba(255,255,255,.02);
+  border-radius: 7px;
+}
+.nm-lever-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+.nm-footer {
+  font-size: .78rem;
+  color: var(--dim);
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  line-height: 1.6;
+}
+
+/* GAP METRICS */
+.gap-section { margin-bottom: 28px; }
+.section-hdr-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gold);
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.gap-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.gap-card {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 18px 20px;
+}
+.gap-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.gap-amount {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.gap-amount.pos { color: var(--green); }
+.gap-amount.neg { color: var(--red); }
+.gap-amount.neu { color: var(--gold-l); }
+.gap-sub { font-size: .75rem; color: var(--muted); line-height: 1.5; }
+.progress-bar-wrap { margin-top: 10px; }
+.progress-track { height: 6px; background: var(--s3); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; width: 0; transition: width 1s cubic-bezier(.4,0,.2,1); }
+.progress-pct {
+  font-family: 'DM Mono', monospace;
+  font-size: .7rem;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+/* CHART */
+.chart-section { margin-bottom: 28px; }
+.chart-legend { display: flex; gap: 14px; flex-wrap: wrap; }
+.leg-item { display: flex; align-items: center; gap: 6px; font-size: .74rem; color: var(--muted); }
+.leg-dot { width: 10px; height: 10px; border-radius: 2px; }
+.leg-dot.e          { background: var(--ess); }
+.leg-dot.o          { background: var(--gold); }
+.leg-dot.pct-budget { background: var(--pct-budget); }
+.leg-dot.pct-ess    { background: var(--pct-ess); }
+.chart-item {
+  display: block;
+  margin-bottom: 14px;
+}
+.chart-cat {
+  font-size: .73rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.chart-cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-cat-pct  { font-family: 'DM Mono', monospace; font-size: .66rem; color: var(--gold); flex-shrink: 0; }
+.chart-cat-ess  { font-family: 'DM Mono', monospace; font-size: .66rem; color: var(--dim);  flex-shrink: 0; }
+.chart-bars { display: flex; flex-direction: column; gap: 3px; }
+.chart-track { height: 10px; background: var(--s3); border-radius: 3px; overflow: hidden; }
+.chart-bar { height: 100%; border-radius: 3px; width: 0; transition: width .9s cubic-bezier(.4,0,.2,1); }
+.bar-e { background: linear-gradient(90deg, var(--ess), #3878a8); }
+.bar-o { background: linear-gradient(90deg, #906020, var(--gold-l)); }
+.chart-vals { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
+.chart-val { font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--dim); }
+.chart-val.e { color: var(--ess); }
+.chart-val.o { color: var(--gold); }
+
+/* PATH TO AUTONOMY */
+.path-section {
+  margin-bottom: 22px;
+}
+.path-section .section-hdr-label { margin-bottom: 6px; }
+.path-intro {
+  font-size: .83rem;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+.path-intro strong { color: var(--text); font-weight: 500; }
+.path-table-wrap {
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.path-table-head {
+  display: grid;
+  background: var(--s2);
+  padding: 8px 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: .65rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  border-bottom: 1px solid var(--border);
+}
+.path-table-head.stab-cols { grid-template-columns: 1fr 1fr 1fr; }
+.path-table-head.build-cols { grid-template-columns: 1fr 1fr; }
+.path-row {
+  display: grid;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  transition: background .15s;
+}
+.path-row:last-child { border-bottom: none; }
+.path-row:hover { background: var(--s2); }
+.path-row.stab-cols { grid-template-columns: 1fr 1fr 1fr; }
+.path-row.build-cols { grid-template-columns: 1fr 1fr; }
+.path-row.highlighted { background: var(--gold-d); }
+.path-growth {
+  font-family: 'DM Mono', monospace;
+  font-size: .82rem;
+  color: var(--gold);
+  font-weight: 500;
+}
+.path-time {
+  font-family: 'DM Mono', monospace;
+  font-size: .82rem;
+  color: var(--text);
+}
+.path-time.ess { color: var(--ess); }
+.path-time.achieved {
+  color: var(--auto);
+  font-size: .75rem;
+}
+.path-custom {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  padding: 16px;
+  margin-bottom: 18px;
+}
+.path-custom-label {
+  font-size: .78rem;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.path-custom-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.path-custom-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--s3);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  padding: 7px 12px;
+  width: 160px;
+  flex-shrink: 0;
+}
+.path-custom-pfx {
+  font-family: 'DM Mono', monospace;
+  font-size: .85rem;
+  color: var(--gold);
+}
+.path-custom-input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: .85rem;
+  width: 80px;
+}
+.path-custom-result {
+  font-size: .82rem;
+  color: var(--muted);
+  margin-top: 10px;
+  min-height: 1.4em;
+  line-height: 1.5;
+}
+.path-custom-result strong { color: var(--text); }
+.path-footer {
+  font-size: .76rem;
+  color: var(--dim);
+  font-style: italic;
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+/* AUTONOMY SURPLUS */
+.surplus-section {
+  background: var(--auto-d);
+  border: 1px solid rgba(76,175,130,.25);
+  border-radius: var(--r);
+  padding: 22px 24px;
+  margin-bottom: 22px;
+}
+.surplus-label {
+  font-family: 'DM Mono', monospace;
+  font-size: .65rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--auto);
+  margin-bottom: 6px;
+}
+.surplus-amount {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--auto);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.surplus-sub {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+.surplus-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.surplus-option {
+  background: rgba(76,175,130,.08);
+  border: 1px solid rgba(76,175,130,.18);
+  border-radius: var(--rs);
+  padding: 10px 12px;
+  font-size: .78rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.surplus-option strong { color: var(--auto); display: block; font-size: .72rem; font-family: 'DM Mono',monospace; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px; }
+
+/* EMAIL CAPTURE */
+.report-section {
+  background: linear-gradient(135deg, rgba(200,168,75,.06), rgba(200,168,75,.02));
+  border: 1px solid rgba(200,168,75,.25);
+  border-radius: var(--r);
+  padding: 32px;
+  margin-bottom: 22px;
+  position: relative;
+  overflow: hidden;
+}
+.report-section::before {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 160px; height: 160px;
+  background: radial-gradient(circle, rgba(200,168,75,.08), transparent 70%);
+  pointer-events: none;
+}
+.report-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: .63rem;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+.report-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.55rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  line-height: 1.25;
+}
+.report-sub {
+  font-size: .83rem;
+  color: var(--muted);
+  line-height: 1.65;
+  margin-bottom: 20px;
+}
+.report-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 22px;
+}
+.report-bullets li {
+  font-size: .82rem;
+  color: var(--muted);
+  padding: 4px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
+}
+.report-bullets li::before {
+  content: '◆';
+  color: var(--gold);
+  font-size: .55rem;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.report-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.report-input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--s3);
+  border: 1px solid var(--border2);
+  border-radius: var(--rs);
+  padding: 12px 16px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: .88rem;
+  outline: none;
+  transition: border-color .2s;
+}
+.report-input:focus { border-color: var(--gold); }
+.report-input::placeholder { color: var(--dim); }
+.report-btn {
+  background: linear-gradient(135deg, #c8a84b, #d4af60);
+  color: #0c0c18;
+  border: none;
+  border-radius: var(--rs);
+  padding: 12px 24px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: .88rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity .2s, transform .15s;
+}
+.report-btn:hover { opacity: .9; transform: translateY(-1px); }
+.report-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.report-status {
+  font-size: .78rem;
+  margin-top: 10px;
+  min-height: 1.2em;
+  line-height: 1.5;
+}
+.report-status.ok  { color: var(--auto); }
+.report-status.err { color: var(--stab); }
+.report-privacy {
+  font-size: .72rem;
+  color: var(--dim);
+  margin-top: 10px;
+}
+
+/* SHARE */
+.vote-section {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  padding: 28px 32px;
+  margin-bottom: 22px;
+}
+.vote-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.vote-sub { font-size: .83rem; color: var(--muted); margin-bottom: 20px; line-height: 1.65; }
+.vote-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.vote-btn {
+  padding: 16px 12px;
+  border-radius: var(--rs);
+  border: 1.5px solid var(--border2);
+  background: var(--s3);
+  cursor: pointer;
+  text-align: center;
+  transition: all .22s;
+  font-family: 'DM Sans', sans-serif;
+}
+.vote-btn:hover { transform: translateY(-2px); }
+.vote-btn.stab:hover, .vote-btn.stab.voted  { border-color: rgba(224,92,92,.5);  background: var(--stab-d); }
+.vote-btn.build:hover,.vote-btn.build.voted { border-color: rgba(74,159,212,.5); background: var(--build-d); }
+.vote-btn.auto:hover, .vote-btn.auto.voted  { border-color: rgba(76,175,130,.5); background: var(--auto-d); }
+.vote-btn.voted { transform: translateY(-2px); }
+.vote-phase-dot { width: 10px; height: 10px; border-radius: 50%; margin: 0 auto 8px; }
+.vote-btn.stab  .vote-phase-dot { background: var(--stab); }
+.vote-btn.build .vote-phase-dot { background: var(--build); }
+.vote-btn.auto  .vote-phase-dot { background: var(--auto); }
+.vote-name { font-size: .82rem; font-weight: 500; margin-bottom: 3px; }
+.vote-btn.stab  .vote-name { color: var(--stab); }
+.vote-btn.build .vote-name { color: var(--build); }
+.vote-btn.auto  .vote-name { color: var(--auto); }
+.vote-desc { font-size: .72rem; color: var(--muted); }
+.vote-confirm {
+  text-align: center;
+  padding: 14px;
+  background: rgba(200,168,75,.06);
+  border: 1px solid var(--gold-b);
+  border-radius: var(--rs);
+  font-size: .83rem;
+  color: var(--muted);
+  display: none;
+}
+.vote-confirm.show { display: block; animation: fU .3s ease both; }
+
+/* SHARE */
+.share-section {
+  background: linear-gradient(135deg, #0c0c18, #16110a);
+  border: 1px solid var(--gold-b);
+  border-radius: var(--r);
+  padding: 36px 40px;
+  text-align: center;
+  margin-bottom: 22px;
+  position: relative;
+  overflow: hidden;
+}
+.share-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(200,168,75,.07), transparent);
+  pointer-events: none;
+}
+.share-card-inner {
+  max-width: 380px;
+  margin: 20px auto 0;
+  background: linear-gradient(135deg, #0c0c18, #161008);
+  border: 1px solid rgba(200,168,75,.45);
+  border-radius: 14px;
+  padding: 28px;
+  position: relative;
+}
+.sp-brand {
+  font-family: 'DM Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 4px;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.sp-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.sp-number {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #ede9e3, var(--gold-l));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.sp-row { display: flex; justify-content: space-around; padding-top: 14px; border-top: 1px solid rgba(200,168,75,.18); }
+.sp-col-lbl { font-family: 'DM Mono', monospace; font-size: 7.5px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+.sp-col-val { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 600; }
+.sp-e .sp-col-lbl { color: var(--ess); }
+.sp-e .sp-col-val { color: var(--ess); }
+.sp-o .sp-col-lbl { color: var(--gold); }
+.sp-o .sp-col-val { color: var(--gold-l); }
+
+/* TOAST */
+.val-toast {
+  position: fixed;
+  bottom: 28px; left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1a0e18;
+  border: 1px solid rgba(224,92,92,.45);
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: .81rem;
+  color: #f0a0a0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .25s;
+  max-width: 440px;
+  text-align: left;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+.val-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-icon { flex-shrink: 0; color: var(--red); font-size: .9rem; font-family: 'DM Mono', monospace; }
+
+/* DASHBOARD */
+.dash { padding: 42px 0; }
+.dash-header { margin-bottom: 36px; }
+.dash-title { font-family: 'Cormorant Garamond', serif; font-size: 2.8rem; font-weight: 700; margin-bottom: 8px; }
+.dash-sub { font-size: .9rem; color: var(--muted); }
+.dash-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--rs); padding: 22px 24px; }
+.kpi-label { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.kpi-value { font-family: 'Cormorant Garamond', serif; font-size: 2.4rem; font-weight: 700; color: var(--gold-l); line-height: 1; }
+.kpi-sub { font-size: .75rem; color: var(--dim); margin-top: 5px; }
+.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+.dash-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--rs); padding: 24px 26px; }
+.dash-card-title { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 18px; }
+.phase-dist { display: flex; flex-direction: column; gap: 12px; }
+.ph-row { display: flex; flex-direction: column; gap: 5px; }
+.ph-row-top { display: flex; justify-content: space-between; align-items: center; }
+.ph-row-name { font-size: .82rem; color: var(--text); }
+.ph-row-val { font-family: 'DM Mono', monospace; font-size: .78rem; color: var(--muted); }
+.ph-bar-track { height: 8px; background: var(--s2); border-radius: 4px; overflow: hidden; }
+.ph-bar-fill { height: 100%; border-radius: 4px; }
+.pf-stab  { background: var(--stab); }
+.pf-build { background: var(--build); }
+.pf-auto  { background: var(--auto); }
+.avg-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.avg-row:last-child { border-bottom: none; }
+.avg-label { font-size: .82rem; color: var(--muted); }
+.avg-val { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 600; color: var(--gold-l); }
+.custom-list { display: flex; flex-direction: column; gap: 8px; }
+.custom-tag-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--s2); border-radius: 7px; }
+.custom-tag-name { font-size: .8rem; color: var(--text); }
+.custom-tag-count { font-family: 'DM Mono', monospace; font-size: .75rem; color: var(--gold); background: var(--gold-d); padding: 2px 8px; border-radius: 12px; }
+.no-data { font-size: .84rem; color: var(--dim); text-align: center; padding: 20px; }
+.dash-refresh { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border-radius: var(--rs); border: 1px solid var(--border2); background: transparent; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .75rem; cursor: pointer; transition: all .2s; margin-top: 8px; }
+.dash-refresh:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── START SCREEN ── */
+.start-screen {
+  text-align: center;
+  padding: 20px 0 40px;
+  animation: fU .5s ease both;
+}
+.start-intro {
+  font-size: .92rem;
+  color: var(--muted);
+  max-width: 520px;
+  margin: 0 auto 32px;
+  line-height: 1.75;
+}
+.start-intro strong { color: var(--text); font-weight: 500; }
+.start-privacy {
+  font-family: 'DM Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.start-privacy::before { content: '◆'; font-size: 5px; color: var(--gold); opacity: .6; }
+.currency-row {
+  display: flex; align-items: center; gap: 12px;
+  margin: 20px 0 4px;
+}
+.currency-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8.5px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); white-space: nowrap;
+}
+.currency-sel {
+  background: var(--s2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px;
+  padding: 6px 12px; font-size: .83rem;
+  font-family: 'DM Mono', monospace;
+  cursor: pointer; outline: none;
+}
+.currency-sel:focus { border-color: var(--gold); }
+/* ── CURRENCY PILL PICKER ── */
+.currency-picker {
+  margin: 24px 0 8px;
+  padding: 16px 18px;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+}
+.currency-picker-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 8.5px; letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 12px;
+}
+.currency-pills {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;
+}
+.currency-pill {
+  font-family: 'DM Mono', monospace; font-size: .8rem;
+  padding: 6px 14px; border-radius: 20px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); cursor: pointer;
+  transition: all .18s;
+}
+.currency-pill:hover { border-color: var(--gold); color: var(--gold); }
+.currency-pill.active {
+  background: rgba(200,168,75,.12); border-color: var(--gold);
+  color: var(--gold-l); font-weight: 500;
+}
+.currency-more-row { margin-top: 4px; }
+.currency-more-btn {
+  background: none; border: none; color: var(--dim);
+  font-family: 'DM Mono', monospace; font-size: .72rem;
+  letter-spacing: 1px; cursor: pointer; padding: 4px 0;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.currency-more-btn:hover { color: var(--muted); }
+.currency-more-panel { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.currency-more-panel.hidden { display: none; }
+.currency-custom-row { display: flex; align-items: center; gap: 8px; }
+.currency-custom-inp {
+  background: var(--s1); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 6px 10px;
+  font-family: 'DM Mono', monospace; font-size: .83rem;
+  width: 130px; outline: none;
+}
+.currency-custom-inp:focus { border-color: var(--gold); }
+
+/* ── PHASE CTA ── */
+.phase-cta {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255,255,255,.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.phase-cta-text {
+  font-size: .8rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.phase-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 20px;
+  border-radius: var(--rs);
+  border: 1.5px solid;
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: .8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .22s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.phase-card.stab  .phase-cta-btn { border-color: rgba(224,92,92,.4);  color: var(--stab); }
+.phase-card.build .phase-cta-btn { border-color: rgba(74,159,212,.4); color: var(--build); }
+.phase-card.auto  .phase-cta-btn { border-color: rgba(76,175,130,.4); color: var(--auto); }
+.phase-card.stab  .phase-cta-btn:hover { background: var(--stab-d);  border-color: var(--stab); }
+.phase-card.build .phase-cta-btn:hover { background: var(--build-d); border-color: var(--build); }
+.phase-card.auto  .phase-cta-btn:hover { background: var(--auto-d);  border-color: var(--auto); }
+
+/* ── PRIVACY INLINE ── */
+.privacy-note {
+  font-family: 'DM Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* ── LANGUAGE / GEOGRAPHY CHART ── */
+.geo-list { display: flex; flex-direction: column; gap: 10px; }
+.geo-row { display: flex; flex-direction: column; gap: 4px; }
+.geo-row-top { display: flex; justify-content: space-between; align-items: center; }
+.geo-flag-name { font-size: .82rem; color: var(--text); display: flex; align-items: center; gap: 7px; }
+.geo-flag { font-size: 1rem; line-height: 1; }
+.geo-pct { font-family: 'DM Mono', monospace; font-size: .75rem; color: var(--muted); }
+.geo-bar-track { height: 5px; background: var(--s2); border-radius: 3px; overflow: hidden; }
+.geo-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--gold-d), var(--gold)); }
+
+/* UTILS */
+.hidden { display: none !important; }
+@keyframes fD { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fU { from { opacity: 0; transform: translateY(16px);  } to { opacity: 1; transform: translateY(0); } }
+.screen { animation: fU .42s ease both; }
+footer {
+  text-align: center;
+  padding: 28px 0 52px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .card { padding: 22px 18px; }
+  .quiz-grid, .dual-inputs, .three-nums, .gap-grid, .vote-btns, .focus-grid,
+  .dash-kpis, .dash-grid, .ap-dual { grid-template-columns: 1fr; }
+  .chart-item { grid-template-columns: 80px 1fr; }
+}
+</style>
+
+<body>
+<div class="page-outer">
+
+<!-- MOBILE STICKY BAR -->
+<div class="mobile-bar" id="mobileBar">
+  <div class="mb-item"><div class="mb-label">Essential</div><div class="mb-val e" id="mb-ess">$0</div></div>
+  <div class="mb-sep"></div>
+  <div class="mb-item"><div class="mb-label">Optimal</div><div class="mb-val o" id="mb-opt">$0</div></div>
+  <div class="mb-sep"></div>
+  <div class="mb-item"><div class="mb-label">Gap</div><div class="mb-val g" id="mb-gap">$0</div></div>
+</div>
+
+<!-- PAGE LAYOUT -->
+<div class="page-layout">
+<div class="main-col">
+
+<!-- HEADER -->
+<header>
+  <div class="brand-pill">Income Requirement Engine</div>
+  <h1>The Fulfillment<br><em>Number™</em></h1>
+  <p class="tagline">Define the income your designed life requires. Understand where you stand. Know what to do next.</p>
+</header>
+
+<!-- START SCREEN -->
+<div id="startScreen" class="start-screen">
+  <div class="start-intro">
+    The Fulfillment Number™ calculates the <strong>exact monthly income</strong> your designed life requires — at both a minimum stability level and an optimal level. Enter your allocations across housing, food, transport, health, lifestyle, and growth. The tool returns your Essential Number, your Optimal Number, and a precise gap analysis against your current income.
+  </div>
+  <button class="btn btn-p" style="font-size:1rem;padding:16px 36px;" onclick="beginTool()">Calculate My Fulfillment Number →</button>
+  <div class="start-privacy">No personal data is collected. All calculations run in your browser.</div>
+</div>
+
+<!-- PROGRESS -->
+<div class="prog hidden" id="progBar">
+  <div class="prog-steps">
+    <div class="dot on" id="dot-1">1</div><div class="line" id="ln-1"></div>
+    <div class="dot" id="dot-2">2</div><div class="line" id="ln-2"></div>
+    <div class="dot" id="dot-3">3</div><div class="line" id="ln-3"></div>
+    <div class="dot" id="dot-4">4</div><div class="line" id="ln-4"></div>
+    <div class="dot" id="dot-5">5</div>
+  </div>
+  <div class="prog-lbl" id="progLbl">Step 1 of 5 — Assessment Baseline</div>
+</div>
+
+<!-- STEP 1: QUIZ -->
+<div id="s1" class="screen hidden">
+  <div class="card">
+    <div class="card-title">Assessment Baseline</div>
+    <div class="card-sub">Select the option that most accurately reflects your current or target position. These responses pre-populate both allocation levels. All values are adjustable in the following steps.</div>
+    <div id="quizWrap"></div>
+    <div class="currency-picker" id="currencyPicker">
+      <div class="currency-picker-label">Your currency</div>
+      <div class="currency-pills" id="currencyPills"></div>
+      <div class="currency-more-row">
+        <button class="currency-more-btn" id="currencyMoreBtn" onclick="toggleCurrencyMore()">+ more currencies</button>
+        <div class="currency-more-panel hidden" id="currencyMorePanel">
+          <select class="currency-sel" id="currencySelect" onchange="selectCurrencyFromDropdown(this.value)">
+            <option value="">— select —</option>
+            <option value="NZ$">NZ$ — New Zealand Dollar</option>
+            <option value="GH₵">GH₵ — Ghanaian Cedi</option>
+            <option value="KSh">KSh — Kenyan Shilling</option>
+            <option value="SAR ">SAR — Saudi Riyal</option>
+            <option value="QAR ">QAR — Qatari Riyal</option>
+            <option value="KWD ">KWD — Kuwaiti Dinar</option>
+            <option value="BHD ">BHD — Bahraini Dinar</option>
+            <option value="E£">E£ — Egyptian Pound</option>
+            <option value="¥">¥ — Japanese Yen</option>
+            <option value="CN¥">CN¥ — Chinese Yuan</option>
+            <option value="NT$">NT$ — Taiwan Dollar</option>
+            <option value="₩">₩ — South Korean Won</option>
+            <option value="RM">RM — Malaysian Ringgit</option>
+            <option value="S$">S$ — Singapore Dollar</option>
+            <option value="MX$">MX$ — Mexican Peso</option>
+            <option value="R$">R$ — Brazilian Real</option>
+            <option value="₺">₺ — Turkish Lira</option>
+            <option value="₽">₽ — Russian Ruble</option>
+            <option value="CHF ">CHF — Swiss Franc</option>
+            <option value="SEK ">SEK — Swedish Krona</option>
+            <option value="NOK ">NOK — Norwegian Krone</option>
+            <option value="DKK ">DKK — Danish Krone</option>
+            <option value="PLN ">PLN — Polish Zloty</option>
+            <option value="CZK ">CZK — Czech Koruna</option>
+            <option value="ILS ">ILS — Israeli Shekel</option>
+            <option value="PKR ">PKR — Pakistani Rupee</option>
+            <option value="BDT ">BDT — Bangladeshi Taka</option>
+            <option value="PHP ">PHP — Philippine Peso</option>
+            <option value="IDR ">IDR — Indonesian Rupiah</option>
+            <option value="THB ">THB — Thai Baht</option>
+            <option value="VND ">VND — Vietnamese Dong</option>
+          </select>
+          <div class="currency-custom-row">
+            <input type="text" id="currencyCustom" class="currency-custom-inp" placeholder="or type symbol…" maxlength="6"
+              oninput="if(this.value.trim()) selectCurrencyPill(this.value.trim())">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <span></span>
+      <button class="btn btn-p" onclick="finishQuiz()">Continue to Allocation Input →</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2: HOUSING -->
+<div id="s2" class="screen hidden">
+  <div class="card">
+    <div class="card-title">Housing & Utilities</div>
+    <div class="card-sub">Enter the monthly cost of each item at the Essential level and at the Optimal level. Where both figures are identical, use the toggle.</div>
+    <div class="info-box">
+      <strong>Essential</strong> — the minimum required allocation to maintain stability.<br>
+      <strong>Optimal</strong> — the allocation required to operate at your designed level.<br>
+      Optimal is pre-set to match Essential. Raise it where your designed level exceeds the minimum.
+    </div>
+    <div id="sec-housing"></div>
+    <div class="btn-row">
+      <button class="btn btn-s" onclick="goTo(1)">← Back</button>
+      <button class="btn btn-p" onclick="goTo(3)">Continue →</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3: FOOD / TRANSPORT / HEALTH -->
+<div id="s3" class="screen hidden">
+  <div class="card">
+    <div class="card-title">Food, Transport &amp; Health</div>
+    <div class="card-sub">Enter allocations at both levels for each item.</div>
+    <div id="sec-food"></div>
+    <div class="divider"></div>
+    <div id="sec-transport"></div>
+    <div class="divider"></div>
+    <div id="sec-health"></div>
+    <div class="btn-row">
+      <button class="btn btn-s" onclick="goTo(2)">← Back</button>
+      <button class="btn btn-p" onclick="goTo(4)">Continue →</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 4: LIFESTYLE / GIVING / GROWTH -->
+<div id="s4" class="screen hidden">
+  <div class="card">
+    <div class="card-title">Lifestyle, Giving &amp; Growth</div>
+    <div class="card-sub">Include all value-based and obligation-based allocations unique to your life. Faith commitments, charitable obligations, family support, and development costs all belong here.</div>
+    <div id="sec-lifestyle"></div>
+    <div class="divider"></div>
+    <div id="sec-giving"></div>
+    <div class="divider"></div>
+    <div id="sec-growth"></div>
+    <div class="divider"></div>
+    <div id="sec-savings"></div>
+    <div class="btn-row">
+      <button class="btn btn-s" onclick="goTo(3)">← Back</button>
+      <button class="btn btn-p" onclick="goTo(5)">Generate Results →</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 5: RESULTS -->
+<div id="s5" class="screen hidden">
+  <div class="card">
+    <div class="card-title">Your Fulfillment Number™</div>
+    <div class="card-sub">Your complete income requirement analysis, across both allocation levels.</div>
+
+    <!-- INCOME INPUT -->
+    <div class="income-input-section">
+      <div class="income-label">Current Net Monthly Income</div>
+      <div class="income-help">Enter your <strong>post-tax take-home figure</strong> — the amount deposited into your account each month. Net income is used because it reflects actual allocatable funds. Gross figures will produce an inaccurate analysis. Source: your payslip, or average your last three months of bank deposits.</div>
+      <div class="income-inp-row">
+        <div class="income-inp-wrap">
+          <span class="income-pfx" id="incomePfx">$</span>
+          <input type="number" id="incomeInput" min="0" step="100" placeholder="0"
+            oninput="refreshResults()"
+            onblur="onIncomeBlur()">
+        </div>
+      </div>
+      <div class="privacy-note">Anonymous usage data only. No personal information is collected.</div>
+    </div>
+
+    <!-- PERIOD TOGGLE -->
+    <div class="period-row">
+      <span style="font-size:.82rem;color:var(--muted)">Display period:</span>
+      <div class="ptog">
+        <button class="on" onclick="setPeriod('m',this)">Monthly</button>
+        <button onclick="setPeriod('a',this)">Annual</button>
+      </div>
+    </div>
+
+    <!-- THREE NUMBER CARDS -->
+    <div class="three-nums" id="threeNums">
+      <div class="num-card income" id="card-income" style="order:1">
+        <div class="nc-label">Current Income</div>
+        <div class="nc-amount" id="nc-income">—</div>
+        <div class="nc-period" id="nc-income-p">/ month</div>
+        <div class="nc-sub" id="nc-income-s">Enter income above</div>
+      </div>
+      <div class="num-card ess" id="card-ess" style="order:2">
+        <div class="nc-label">Essential Number</div>
+        <div class="nc-amount" id="nc-ess">$0</div>
+        <div class="nc-period" id="nc-ess-p">/ month</div>
+        <div class="nc-sub" id="nc-ess-s"></div>
+      </div>
+      <div class="num-card opt" id="card-opt" style="order:3">
+        <div class="nc-label">Optimal Number</div>
+        <div class="nc-amount" id="nc-opt">$0</div>
+        <div class="nc-period" id="nc-opt-p">/ month</div>
+        <div class="nc-sub" id="nc-opt-s"></div>
+      </div>
+    </div>
+
+    <!-- AUTONOMY SCORE -->
+    <div id="autoScore"></div>
+
+    <!-- PHASE DIAGNOSTIC -->
+    <div id="phaseDiag"></div>
+
+    <!-- NEXT STRATEGIC MOVE -->
+    <div id="nextMove"></div>
+
+    <!-- GAP ANALYSIS -->
+    <div class="gap-section" id="gapSection"></div>
+
+    <!-- PATH TO AUTONOMY -->
+    <div id="pathSection"></div>
+
+    <!-- ALLOCATION CHART -->
+    <div class="chart-section">
+      <div style="padding:9px 0;border-bottom:1px solid var(--border);margin-bottom:12px;">
+        <div class="section-hdr-label" style="border:none;padding:0;margin:0 0 10px;">Allocation Breakdown</div>
+        <div class="chart-legend">
+          <div class="leg-item"><div class="leg-dot e"></div>Essential $</div>
+          <div class="leg-item"><div class="leg-dot o"></div>Optimal $</div>
+          <div class="leg-item"><div class="leg-dot pct-budget"></div>% of budget</div>
+          <div class="leg-item"><div class="leg-dot pct-ess"></div>% essential</div>
+        </div>
+      </div>
+      <div id="chartBars"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-s" onclick="goTo(4)">← Adjust</button>
+      <button class="btn btn-p" onclick="showShare()">Get My Badge</button>
+      <button class="btn btn-s" onclick="startOver()">Start Over</button>
+    </div>
+
+    <div style="text-align:center;padding:18px 0 4px;font-size:.75rem;color:var(--dim)">
+      This analysis is based on the <a href="https://rewardshift.com" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">RewardShift</a> financial framework.
+    </div>
+  </div>
+
+  <!-- phase CTA is rendered inside phaseDiag by renderPhase() -->
+
+  <!-- EMAIL CAPTURE — FULFILLMENT REPORT -->
+  <div class="report-section" id="reportSection" style="display:none">
+    <div class="report-eyebrow">◆ Free Personalised Report</div>
+    <div class="report-title">Get Your Fulfillment Report</div>
+    <div class="report-sub">We'll send a personalised breakdown of your numbers directly to your inbox — your score, your gap, and your path forward.</div>
+    <ul class="report-bullets">
+      <li>Your Autonomy Score and what it means</li>
+      <li>Your Essential and Optimal Allocation breakdown</li>
+      <li>Your Fulfillment Gap and how to close it</li>
+      <li>Your phase strategy and next moves</li>
+    </ul>
+    <div class="report-form">
+      <input class="report-input" type="email" id="reportEmail" placeholder="your@email.com" autocomplete="email">
+      <button class="report-btn" id="reportBtn" onclick="submitReport()">Send My Report</button>
+    </div>
+    <div class="report-status" id="reportStatus"></div>
+    <div class="report-privacy">No spam. Unsubscribe any time. Your data is never sold.</div>
+  </div>
+
+  <!-- SHARE SECTION -->
+  <div class="share-section hidden" id="shareSection">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:1.45rem;font-weight:600;margin-bottom:6px;position:relative;">Your Fulfillment Number Badge</div>
+    <p style="font-size:.83rem;color:var(--muted);position:relative;">Copy the image or text to share your badge anywhere.</p>
+    <div class="share-card-inner" id="shareCardEl">
+      <div class="sp-brand">The Fulfillment Number™</div>
+      <div class="sp-title">Annual income requirement — Optimal level</div>
+      <div class="sp-number" id="sp-opt">$0</div>
+      <div class="sp-row">
+        <div class="sp-e">
+          <div class="sp-col-lbl">Essential</div>
+          <div class="sp-col-val" id="sp-ess">$0</div>
+        </div>
+        <div class="sp-o">
+          <div class="sp-col-lbl">Optimal</div>
+          <div class="sp-col-val" id="sp-onum">$0</div>
+        </div>
+        <div class="sp-o" id="sp-score-col" style="display:none">
+          <div class="sp-col-lbl">Autonomy Score</div>
+          <div class="sp-col-val" id="sp-score" style="color:var(--auto)">—</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:22px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;position:relative;">
+      <button class="btn btn-p" onclick="copyBadgeImage(this)">Copy Badge Image</button>
+      <button class="btn btn-s" onclick="copyBadgeText()">Copy Badge Text</button>
+      <button class="btn btn-s" onclick="startOver()">Start Over</button>
+    </div>
+    <canvas id="badgeCanvas" style="display:none;"></canvas>
+  </div>
+
+</div><!-- /s5 -->
+
+<footer id="mainFooter">
+  The Fulfillment Number™ &nbsp;·&nbsp; Your life, your number &nbsp;·&nbsp;
+  <span style="color:var(--dim);cursor:pointer;" onclick="location.href='?dashboard'">Creator Dashboard</span>
+</footer>
+
+</div><!-- /main-col -->
+
+<!-- DESKTOP SIDEBAR -->
+<div class="sidebar-col" id="sidebarCol">
+  <div class="sidebar">
+    <div class="sb-header">Live Allocation Summary</div>
+    <div class="sb-row">
+      <div class="sb-label">Essential Total</div>
+      <div class="sb-value e" id="sb-ess">$0</div>
+    </div>
+    <div class="sb-row">
+      <div class="sb-label">Optimal Total</div>
+      <div class="sb-value o" id="sb-opt">$0</div>
+    </div>
+    <div class="sb-row">
+      <div class="sb-label">Fulfillment Gap</div>
+      <div class="sb-value g" id="sb-gap">$0</div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-row">
+      <div class="sb-label">Current Income</div>
+      <div class="sb-value i" id="sb-inc">—</div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-row">
+      <div class="sb-label">Phase</div>
+      <div class="sb-phase-badge none" id="sb-phase">Not assessed</div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-row">
+      <div class="sb-label">Largest Allocation</div>
+      <div class="sb-top-cat-name" id="sb-cat-name">—</div>
+      <div class="sb-top-cat-val" id="sb-cat-val"></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /page-layout -->
+
+<!-- DASHBOARD VIEW -->
+<div id="dashView" class="hidden">
+  <div style="max-width:960px;margin:0 auto;padding:0 22px;">
+  <div class="dash">
+    <div class="dash-header">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--gold);margin-bottom:12px;text-transform:uppercase;">◆ Creator Analytics</div>
+      <div class="dash-title">Fulfillment Number™<br>Dashboard</div>
+      <div class="dash-sub">Aggregated anonymous data from all tool completions.</div>
+      <button class="dash-refresh" onclick="loadDash()">↻ Refresh</button>
+      <button class="dash-refresh" onclick="location.href=location.pathname" style="margin-left:8px;">← Back to Tool</button>
+    </div>
+
+    <!-- KPI ROW 1: Session counts -->
+    <div class="dash-kpis" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi">
+        <div class="kpi-label">Total Sessions</div>
+        <div class="kpi-value" id="d-sessions">—</div>
+        <div class="kpi-sub">Tool started deliberately</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Total Completions</div>
+        <div class="kpi-value" id="d-total">—</div>
+        <div class="kpi-sub">Income entered and analysed</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Completion Rate</div>
+        <div class="kpi-value" id="d-comp-rate">—</div>
+        <div class="kpi-sub">Sessions that reached results</div>
+      </div>
+    </div>
+
+    <!-- KPI ROW 2: Financial averages -->
+    <div class="dash-kpis" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi">
+        <div class="kpi-label">Avg Essential</div>
+        <div class="kpi-value" id="d-avg-e">—</div>
+        <div class="kpi-sub">Average monthly Essential</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Avg Optimal</div>
+        <div class="kpi-value" id="d-avg-o">—</div>
+        <div class="kpi-sub">Average monthly Optimal</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Avg Reported Income</div>
+        <div class="kpi-value" id="d-avg-inc">—</div>
+        <div class="kpi-sub">Average net monthly income</div>
+      </div>
+    </div>
+
+    <!-- KPI ROW 3: Recency -->
+    <div class="dash-kpis" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi">
+        <div class="kpi-label">Sessions Today</div>
+        <div class="kpi-value" id="d-today">—</div>
+        <div class="kpi-sub">Completions in last 24h</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Sessions This Week</div>
+        <div class="kpi-value" id="d-week">—</div>
+        <div class="kpi-sub">Last 7 days</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Sessions This Month</div>
+        <div class="kpi-value" id="d-month">—</div>
+        <div class="kpi-sub">Last 30 days</div>
+      </div>
+    </div>
+
+    <!-- KPI ROW 4: Quality metrics -->
+    <div class="dash-kpis" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi">
+        <div class="kpi-label">Avg Fulfillment Gap</div>
+        <div class="kpi-value" id="d-avg-gap">—</div>
+        <div class="kpi-sub">Avg Optimal minus Essential</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Adjustment Rate</div>
+        <div class="kpi-value" id="d-adj-rate">—</div>
+        <div class="kpi-sub">Sessions that went back to adjust</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Avg Time to Complete</div>
+        <div class="kpi-value" id="d-avg-time">—</div>
+        <div class="kpi-sub">From start to income entry</div>
+      </div>
+    </div>
+
+    <!-- GRID ROW 1 -->
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dash-card-title">Phase Distribution</div>
+        <div id="d-phase-dist"></div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-title">Completion Rate</div>
+        <div id="d-comp-rate-card"></div>
+      </div>
+    </div>
+
+    <!-- GRID ROW 2 -->
+    <div class="dash-grid">
+      <div class="dash-card" style="grid-column:1/-1">
+        <div class="dash-card-title">Quiz Response Breakdown</div>
+        <div id="d-quiz-breakdown"></div>
+      </div>
+    </div>
+
+    <!-- GRID ROW 3 -->
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dash-card-title">Avg Optimal Allocation by Category</div>
+        <div id="d-avg-cats"></div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-title">Essential vs Optimal Ratio by Category</div>
+        <div id="d-ess-opt-ratio"></div>
+      </div>
+    </div>
+
+    <!-- GRID ROW 4 -->
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dash-card-title">Most Added Custom Items</div>
+        <div class="custom-list" id="d-custom-items"></div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-title">Audience Geography</div>
+        <div id="d-geo"></div>
+      </div>
+    </div>
+
+    <!-- GRID ROW 5 -->
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dash-card-title">Device &amp; Platform</div>
+        <div id="d-devices"></div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-title">Abandoned Sessions</div>
+        <div id="d-abandoned-card"></div>
+      </div>
+    </div>
+
+    <!-- FULL WIDTH: TALKING POINTS -->
+    <div class="dash-card" style="margin-bottom:28px;">
+      <div class="dash-card-title">Content Talking Points</div>
+      <div id="d-talking-pts" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+  </div>
+  </div>
+</div><!-- /dashView -->
+
+<!-- TOAST -->
+<div class="val-toast" id="valToast">
+  <span class="toast-icon">—</span>
+  <span id="valToastMsg"></span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  DATA — SECTIONS
+// ═══════════════════════════════════════════
+const SECTIONS = [
+  { id: 'housing', label: 'Housing & Home', screen: 2, fields: [
+    { id: 'rent',   label: 'Rent / Mortgage' },
+    { id: 'elec',   label: 'Electricity & Gas' },
+    { id: 'net',    label: 'Internet' },
+    { id: 'phone',  label: 'Phone Plan' },
+    { id: 'stream', label: 'Streaming Services' },
+    { id: 'home_x', label: 'Home Improvements' },
+  ]},
+  { id: 'food', label: 'Food & Groceries', screen: 3, fields: [
+    { id: 'groc', label: 'Groceries' },
+    { id: 'dine', label: 'Dining Out' },
+    { id: 'coff', label: 'Coffee & Drinks' },
+  ]},
+  { id: 'transport', label: 'Transport', screen: 3, fields: [
+    { id: 'carpay', label: 'Car Payment / Lease' },
+    { id: 'fuel',   label: 'Fuel / Rideshare' },
+    { id: 'carins', label: 'Car Insurance' },
+    { id: 'car_x',  label: 'Additional / Luxury Vehicle' },
+  ]},
+  { id: 'health', label: 'Health & Wellbeing', screen: 3, fields: [
+    { id: 'hins', label: 'Health Insurance' },
+    { id: 'gym',  label: 'Gym / Fitness' },
+    { id: 'ther', label: 'Therapy / Coaching' },
+    { id: 'well', label: 'Supplements & Wellness' },
+  ]},
+  { id: 'lifestyle', label: 'Travel & Experiences', screen: 4, fields: [
+    { id: 'travel', label: 'Holidays & Vacations' },
+    { id: 'ent',    label: 'Entertainment & Events' },
+    { id: 'hobby',  label: 'Hobbies' },
+    { id: 'subs',   label: 'Apps & Subscriptions' },
+  ]},
+  { id: 'giving', label: 'Giving, Faith & Family', screen: 4, fields: [
+    { id: 'charity', label: 'Charitable Giving' },
+    { id: 'gifts',   label: 'Gifts & Seasonal Obligations' },
+    { id: 'child',   label: 'Childcare / Education' },
+    { id: 'famsup',  label: 'Family Support' },
+  ]},
+  { id: 'growth', label: 'Personal Growth', screen: 4, fields: [
+    { id: 'books',  label: 'Books & Courses' },
+    { id: 'mentor', label: 'Mentorship / Coaching' },
+    { id: 'soft',   label: 'Software & Tools' },
+  ]},
+  { id: 'savings', label: 'Savings & Security', screen: 4, fields: [
+    { id: 'sav',   label: 'Savings & Investments' },
+    { id: 'emerg', label: 'Emergency Fund' },
+  ]},
+];
+
+// ═══════════════════════════════════════════
+//  DATA — DEFAULTS
+// ═══════════════════════════════════════════
+const DEF = {
+  rent:   { e: 1200, o: 2500 }, elec:   { e: 100,  o: 180  },
+  net:    { e: 60,   o: 80   }, phone:  { e: 50,   o: 80   },
+  stream: { e: 0,    o: 60   }, home_x: { e: 0,    o: 200  },
+  groc:   { e: 300,  o: 600  }, dine:   { e: 60,   o: 300  },
+  coff:   { e: 20,   o: 80   },
+  carpay: { e: 200,  o: 600  }, fuel:   { e: 120,  o: 200  },
+  carins: { e: 90,   o: 180  }, car_x:  { e: 0,    o: 300  },
+  hins:   { e: 200,  o: 400  }, gym:    { e: 30,   o: 80   },
+  ther:   { e: 0,    o: 150  }, well:   { e: 20,   o: 60   },
+  travel: { e: 0,    o: 400  }, ent:    { e: 60,   o: 250  },
+  hobby:  { e: 40,   o: 200  }, subs:   { e: 20,   o: 80   },
+  charity:{ e: 0,    o: 100  }, gifts:  { e: 0,    o: 120  },
+  child:  { e: 0,    o: 800  }, famsup: { e: 0,    o: 100  },
+  books:  { e: 20,   o: 60   }, mentor: { e: 0,    o: 150  },
+  soft:   { e: 15,   o: 50   },
+  sav:    { e: 200,  o: 600  }, emerg:  { e: 100,  o: 300  },
+};
+
+// ═══════════════════════════════════════════
+//  DATA — QUIZ
+// ═══════════════════════════════════════════
+const QUIZ = [
+  { id: 'q_home', text: 'Housing structure — current or target:', opts: [
+    { label: 'Shared or modest apartment',
+      v: { rent:{e:800,o:1000}, elec:{e:70,o:80}, net:{e:50,o:60}, phone:{e:40,o:45}, stream:{e:0,o:25}, home_x:{e:0,o:0} } },
+    { label: 'Solo apartment, mid-size city',
+      v: { rent:{e:1200,o:1800}, elec:{e:100,o:140}, net:{e:60,o:70}, phone:{e:50,o:60}, stream:{e:0,o:50}, home_x:{e:0,o:100} } },
+    { label: 'Comfortable apartment or home',
+      v: { rent:{e:1800,o:3000}, elec:{e:140,o:200}, net:{e:70,o:90}, phone:{e:65,o:90}, stream:{e:0,o:80}, home_x:{e:0,o:250} } },
+    { label: 'Spacious or premium property',
+      v: { rent:{e:2500,o:5000}, elec:{e:180,o:300}, net:{e:80,o:110}, phone:{e:80,o:120}, stream:{e:0,o:120}, home_x:{e:0,o:600} } },
+  ]},
+  { id: 'q_food', text: 'Food and dining pattern:', opts: [
+    { label: 'Home cooking, cost-conscious',
+      v: { groc:{e:200,o:250}, dine:{e:40,o:80}, coff:{e:10,o:20} } },
+    { label: 'Home cooking with occasional dining out',
+      v: { groc:{e:300,o:450}, dine:{e:80,o:200}, coff:{e:25,o:60} } },
+    { label: 'Quality produce with regular dining out',
+      v: { groc:{e:450,o:700}, dine:{e:150,o:450}, coff:{e:50,o:100} } },
+    { label: 'Premium dining, limited home cooking',
+      v: { groc:{e:300,o:500}, dine:{e:200,o:900}, coff:{e:60,o:160} } },
+  ]},
+  { id: 'q_transport', text: 'Primary transport arrangement:', opts: [
+    { label: 'Public transit / active commute',
+      v: { carpay:{e:0,o:0}, fuel:{e:60,o:80}, carins:{e:0,o:0}, car_x:{e:0,o:0} } },
+    { label: 'Reliable used vehicle',
+      v: { carpay:{e:150,o:200}, fuel:{e:100,o:130}, carins:{e:80,o:100}, car_x:{e:0,o:0} } },
+    { label: 'Mid-range vehicle, standard commute',
+      v: { carpay:{e:300,o:500}, fuel:{e:150,o:200}, carins:{e:120,o:160}, car_x:{e:0,o:100} } },
+    { label: 'Premium vehicle or multiple vehicles',
+      v: { carpay:{e:500,o:1200}, fuel:{e:180,o:280}, carins:{e:180,o:300}, car_x:{e:0,o:400} } },
+  ]},
+  { id: 'q_travel', text: 'Travel and lifestyle frequency:', opts: [
+    { label: 'Occasional domestic travel',
+      v: { travel:{e:0,o:100}, ent:{e:50,o:100}, hobby:{e:30,o:60}, subs:{e:15,o:30} } },
+    { label: 'Several domestic trips per year',
+      v: { travel:{e:0,o:250}, ent:{e:80,o:180}, hobby:{e:60,o:130}, subs:{e:20,o:50} } },
+    { label: 'One international and multiple domestic trips',
+      v: { travel:{e:0,o:600}, ent:{e:120,o:300}, hobby:{e:100,o:250}, subs:{e:25,o:80} } },
+    { label: 'Frequent international travel',
+      v: { travel:{e:0,o:1500}, ent:{e:200,o:600}, hobby:{e:200,o:500}, subs:{e:40,o:120} } },
+  ]},
+  { id: 'q_family', text: 'Household and dependant structure:', opts: [
+    { label: 'Single, no dependants',
+      v: { charity:{e:0,o:50}, gifts:{e:0,o:50}, child:{e:0,o:0}, famsup:{e:0,o:0},
+           hins:{e:150,o:200}, gym:{e:30,o:60}, ther:{e:0,o:0}, well:{e:15,o:40},
+           books:{e:15,o:40}, mentor:{e:0,o:0}, soft:{e:15,o:30}, sav:{e:150,o:400}, emerg:{e:80,o:200} } },
+    { label: 'Partner, no children',
+      v: { charity:{e:0,o:80}, gifts:{e:0,o:100}, child:{e:0,o:0}, famsup:{e:0,o:50},
+           hins:{e:250,o:380}, gym:{e:50,o:100}, ther:{e:0,o:100}, well:{e:30,o:70},
+           books:{e:25,o:60}, mentor:{e:0,o:80}, soft:{e:20,o:40}, sav:{e:300,o:700}, emerg:{e:150,o:350} } },
+    { label: 'Family with young children',
+      v: { charity:{e:0,o:90}, gifts:{e:0,o:150}, child:{e:600,o:1400}, famsup:{e:0,o:80},
+           hins:{e:380,o:600}, gym:{e:40,o:80}, ther:{e:0,o:120}, well:{e:40,o:80},
+           books:{e:30,o:70}, mentor:{e:0,o:100}, soft:{e:25,o:50}, sav:{e:400,o:900}, emerg:{e:200,o:500} } },
+    { label: 'Family with school-age children',
+      v: { charity:{e:0,o:120}, gifts:{e:0,o:200}, child:{e:500,o:1100}, famsup:{e:0,o:120},
+           hins:{e:480,o:750}, gym:{e:50,o:100}, ther:{e:0,o:150}, well:{e:40,o:80},
+           books:{e:40,o:90}, mentor:{e:0,o:130}, soft:{e:30,o:60}, sav:{e:500,o:1100}, emerg:{e:250,o:600} } },
+  ]},
+];
+
+// ═══════════════════════════════════════════
+//  PHASE CONTENT URLS — update before launch
+// ═══════════════════════════════════════════
+const PHASE_URLS = {
+  stability: 'https://rewardshift.com/stability',
+  build:     'https://rewardshift.com/build',
+  autonomy:  'https://rewardshift.com/autonomy',
+};
+const PHASE_CTA = {
+  stability: 'See the Stability Playbook',
+  build:     'See the Build Playbook',
+  autonomy:  'See the Autonomy Playbook',
+};
+
+// ═══════════════════════════════════════════
+//  LOCALE → COUNTRY MAP
+// ═══════════════════════════════════════════
+const LOCALE_MAP = {
+  'en-US':'🇺🇸 United States','en-CA':'🇨🇦 Canada','en-GB':'🇬🇧 United Kingdom',
+  'en-AU':'🇦🇺 Australia','en-NZ':'🇳🇿 New Zealand','en-ZA':'🇿🇦 South Africa',
+  'en-NG':'🇳🇬 Nigeria','en-GH':'🇬🇭 Ghana','en-KE':'🇰🇪 Kenya',
+  'ar-SA':'🇸🇦 Saudi Arabia','ar-AE':'🇦🇪 UAE','ar-EG':'🇪🇬 Egypt',
+  'ar-QA':'🇶🇦 Qatar','ar-KW':'🇰🇼 Kuwait','ar-BH':'🇧🇭 Bahrain',
+  'fr-FR':'🇫🇷 France','fr-CA':'🇨🇦 Canada (FR)','de-DE':'🇩🇪 Germany',
+  'es-ES':'🇪🇸 Spain','es-MX':'🇲🇽 Mexico','pt-BR':'🇧🇷 Brazil',
+  'pt-PT':'🇵🇹 Portugal','nl-NL':'🇳🇱 Netherlands','it-IT':'🇮🇹 Italy',
+  'tr-TR':'🇹🇷 Turkey','ru-RU':'🇷🇺 Russia','ja-JP':'🇯🇵 Japan',
+  'zh-CN':'🇨🇳 China','zh-TW':'🇹🇼 Taiwan','ko-KR':'🇰🇷 South Korea',
+  'hi-IN':'🇮🇳 India','ms-MY':'🇲🇾 Malaysia','ms-SG':'🇸🇬 Singapore',
+};
+function localeToCountry(locale) {
+  if (!locale) return '🌐 Unknown';
+  if (LOCALE_MAP[locale]) return LOCALE_MAP[locale];
+  // Try language only
+  const lang = locale.split('-')[0];
+  const match = Object.entries(LOCALE_MAP).find(([k]) => k.startsWith(lang + '-'));
+  return match ? match[1] : '🌐 ' + locale;
+}
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+const ev = {};
+const custom = {};
+const qsel = {};
+SECTIONS.forEach(s => { custom[s.id] = []; });
+let period = 'm', ctr = 0, currentStep = 0;
+let sessionId = null, sessionStart = null, lastLoggedIncome = null;
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+function init() {
+  if (window.location.search.includes('dashboard')) { showDash(); return; }
+  // Set income prefix to persisted/detected currency
+  const ip = document.getElementById('incomePfx');
+  if (ip) ip.textContent = currSym;
+  SECTIONS.forEach(s => s.fields.forEach(f => {
+    ev[f.id] = { e: DEF[f.id]?.e || 0, o: DEF[f.id]?.o || 0 };
+  }));
+  buildQuiz();
+  SECTIONS.forEach(buildSection);
+  renderCurrencyPills();
+}
+
+// ═══════════════════════════════════════════
+//  CURRENCY PILL PICKER
+// ═══════════════════════════════════════════
+const CURRENCY_MAJORS = [
+  { sym: '$',   label: '$ USD' },
+  { sym: '£',   label: '£ GBP' },
+  { sym: '€',   label: '€ EUR' },
+  { sym: 'CA$', label: 'CA$' },
+  { sym: 'A$',  label: 'A$' },
+  { sym: '₦',   label: '₦ NGN' },
+  { sym: 'AED ',label: 'AED' },
+  { sym: '₹',   label: '₹ INR' },
+];
+
+function renderCurrencyPills() {
+  const container = document.getElementById('currencyPills');
+  if (!container) return;
+  container.innerHTML = CURRENCY_MAJORS.map(c =>
+    `<button class="currency-pill${currSym === c.sym ? ' active' : ''}"
+      onclick="selectCurrencyPill('${c.sym}')">${c.label}</button>`
+  ).join('');
+}
+
+function selectCurrencyPill(sym) {
+  setCurrency(sym);
+  renderCurrencyPills();
+  // Clear custom input if a pill was tapped
+  const ci = document.getElementById('currencyCustom');
+  if (ci && CURRENCY_MAJORS.some(c => c.sym === sym)) ci.value = '';
+}
+
+function selectCurrencyFromDropdown(sym) {
+  if (!sym) return;
+  setCurrency(sym);
+  renderCurrencyPills(); // deactivate any active pill
+  document.getElementById('currencySelect').value = '';
+}
+
+function toggleCurrencyMore() {
+  const panel = document.getElementById('currencyMorePanel');
+  const btn   = document.getElementById('currencyMoreBtn');
+  const open  = !panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', open);
+  btn.textContent = open ? '+ more currencies' : '− fewer currencies';
+}
+
+function beginTool() {
+  sessionId    = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  sessionStart = Date.now();
+
+  // Capture passive metrics at session start
+  const locale  = navigator.language || '';
+  const country = localeToCountry(locale);
+  const screen  = window.innerWidth < 640 ? 'mobile' : window.innerWidth < 1024 ? 'tablet' : 'desktop';
+  const browser = (()=>{
+    const ua = navigator.userAgent;
+    if (ua.includes('Edg'))     return 'Edge';
+    if (ua.includes('Chrome'))  return 'Chrome';
+    if (ua.includes('Firefox')) return 'Firefox';
+    if (ua.includes('Safari'))  return 'Safari';
+    return 'Other';
+  })();
+  const today = new Date().toISOString().slice(0, 10);
+
+  logSession({ lastStep: 1, completed: false, adjusted: false,
+               country, screen, browser, date: today });
+
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('progBar').classList.remove('hidden');
+  document.getElementById('s1').classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════
+//  QUIZ
+// ═══════════════════════════════════════════
+function buildQuiz() {
+  const c = document.getElementById('quizWrap');
+  c.innerHTML = '';
+  QUIZ.forEach((q, qi) => {
+    const d = document.createElement('div');
+    d.style.marginBottom = qi < QUIZ.length - 1 ? '22px' : '0';
+    d.innerHTML = `<div class="quiz-q">${qi + 1}. ${q.text}</div>
+      <div class="quiz-grid">
+        ${q.opts.map((o, oi) => `
+          <button class="qopt${qsel[q.id] === oi ? ' sel' : ''}"
+            data-q="${q.id}" data-i="${oi}"
+            onclick="pickQ('${q.id}',${oi},this)">${o.label}</button>
+        `).join('')}
+      </div>`;
+    c.appendChild(d);
+  });
+}
+
+function pickQ(qid, oi, el) {
+  document.querySelectorAll(`[data-q="${qid}"]`).forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  qsel[qid] = oi;
+}
+
+function finishQuiz() {
+  QUIZ.forEach(q => {
+    const i = qsel[q.id];
+    if (i === undefined) return;
+    const v = q.opts[i].v;
+    Object.keys(v).forEach(k => {
+      ev[k] = { e: v[k].e, o: v[k].o };
+      const ei = document.getElementById('e_' + k);
+      const oi = document.getElementById('o_' + k);
+      if (ei) ei.value = v[k].e;
+      if (oi) oi.value = v[k].o;
+    });
+  });
+  updateSidebar();
+  goTo(2);
+}
+
+// ═══════════════════════════════════════════
+//  SECTION BUILDER
+// ═══════════════════════════════════════════
+function buildSection(sec) {
+  const cont = document.getElementById('sec-' + sec.id);
+  if (!cont) return;
+  cont.innerHTML = '';
+
+  // Section header — no pills, title only
+  const hdr = document.createElement('div');
+  hdr.className = 'sec-hdr';
+  hdr.innerHTML = `<div class="sec-title">${sec.label}</div>`;
+  cont.appendChild(hdr);
+
+  // Fields list
+  const lst = document.createElement('div');
+  lst.className = 'fields-list';
+  lst.id = 'lst-' + sec.id;
+  sec.fields.forEach(f => lst.appendChild(makeFieldEl(f.id, f.label, false, null)));
+  cont.appendChild(lst);
+
+  // Custom items container
+  const cw = document.createElement('div');
+  cw.id = 'cust-' + sec.id;
+  cont.appendChild(cw);
+
+  // Add item button + panel
+  const aw = document.createElement('div');
+  aw.className = 'add-wrap';
+  aw.innerHTML = `
+    <button class="add-btn" onclick="togglePanel('ap-${sec.id}')">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+        <circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M6.5 3.5v6M3.5 6.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      Add a custom obligation or allocation to <em style="font-style:normal;color:var(--gold)">${sec.label}</em>
+    </button>
+    <div class="add-panel" id="ap-${sec.id}">
+      <div class="ap-title">Add any obligation or value-based allocation unique to your life — e.g. faith obligations, cultural celebrations, family giving traditions, school fees, pet costs, anything uniquely yours.</div>
+      <div class="ap-name">
+        <input type="text" id="nl-${sec.id}" placeholder="Item name">
+      </div>
+      <div class="ap-dual">
+        <div>
+          <div class="ap-dual-label e-lbl">Essential Amount</div>
+          <div class="freq-row">
+            <div style="position:relative;flex:1">
+              <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dim);font-family:'DM Mono',monospace;font-size:.82rem;pointer-events:none">${currSym}</span>
+              <input type="number" id="nae-${sec.id}" class="e-inp freq-inp" min="0" step="1" placeholder="0" style="padding-left:22px">
+            </div>
+            <select class="freq-sel" id="nfe-${sec.id}">
+              <option value="1">/month</option>
+              <option value="12">/year</option>
+              <option value="4">/quarter</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <div class="ap-dual-label o-lbl">Optimal Amount</div>
+          <div class="freq-row">
+            <div style="position:relative;flex:1">
+              <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dim);font-family:'DM Mono',monospace;font-size:.82rem;pointer-events:none">${currSym}</span>
+              <input type="number" id="nao-${sec.id}" class="o-inp freq-inp" min="0" step="1" placeholder="0" style="padding-left:22px"
+                onblur="(function(){
+                  const aeEl=document.getElementById('nae-${sec.id}');
+                  const feEl=document.getElementById('nfe-${sec.id}');
+                  const foEl=document.getElementById('nfo-${sec.id}');
+                  const aoEl=document.getElementById('nao-${sec.id}');
+                  const rawE=parseFloat(aeEl.value)||0; const rawO=parseFloat(aoEl.value)||0;
+                  const mE=rawE/parseFloat(feEl.value); const mO=rawO/parseFloat(foEl.value);
+                  if(mO < mE && rawO > 0){
+                    const corrected = Math.ceil(mE * parseFloat(foEl.value));
+                    aoEl.value = corrected;
+                    aoEl.classList.add('o-warn');
+                    setTimeout(()=>aoEl.classList.remove('o-warn'),1800);
+                    showToast('Optimal cannot be lower than Essential. It has been adjusted to match.');
+                  }
+                })()">
+            </div>
+            <select class="freq-sel" id="nfo-${sec.id}">
+              <option value="1">/month</option>
+              <option value="12">/year</option>
+              <option value="4">/quarter</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="ap-actions">
+        <button class="ap-cancel" onclick="closePanel('ap-${sec.id}')">Cancel</button>
+        <button class="ap-confirm" onclick="addItem('${sec.id}')">Add Item</button>
+      </div>
+    </div>`;
+  cont.appendChild(aw);
+
+  renderCustom(sec.id);
+}
+
+// ═══════════════════════════════════════════
+//  FIELD ELEMENT BUILDER
+// ═══════════════════════════════════════════
+function makeFieldEl(fieldId, label, deletable, cid) {
+  const row = document.createElement('div');
+  row.className = 'field-item';
+  if (cid) row.id = 'cr-' + cid;
+
+  const ve = ev[fieldId]?.e || 0;
+  const vo = ev[fieldId]?.o || 0;
+
+  row.innerHTML = `
+    <div class="field-top">
+      <div class="field-label">${label}</div>
+      ${deletable ? `<button class="del-btn" onclick="removeItem('${cid}')" title="Remove">✕</button>` : ''}
+    </div>
+    <div class="dual-inputs">
+      <div class="inp-col">
+        <div class="inp-lbl e-lbl">Essential</div>
+        <div class="inp-wrap">
+          <span class="inp-pfx">${currSym}</span>
+          <input type="number" id="e_${fieldId}" class="e-inp"
+            min="0" step="10" value="${ve}"
+            oninput="ev['${fieldId}'] = ev['${fieldId}'] || {e:0,o:0}; ev['${fieldId}'].e = parseFloat(this.value)||0; updateSidebar();"
+            onblur="updateVal('${fieldId}','e',this.value)">
+        </div>
+      </div>
+      <div class="inp-col">
+        <div class="inp-lbl o-lbl">Optimal</div>
+        <div class="inp-wrap">
+          <span class="inp-pfx">${currSym}</span>
+          <input type="number" id="o_${fieldId}" class="o-inp"
+            min="0" step="10" value="${vo}"
+            oninput="ev['${fieldId}'] = ev['${fieldId}'] || {e:0,o:0}; ev['${fieldId}'].o = parseFloat(this.value)||0; updateSidebar();"
+            onblur="updateVal('${fieldId}','o',this.value)">
+        </div>
+      </div>
+    </div>`;
+
+  return row;
+}
+
+// ═══════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('valToast');
+  document.getElementById('valToastMsg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4500);
+}
+
+// ═══════════════════════════════════════════
+//  FIELD VALUE UPDATES
+// ═══════════════════════════════════════════
+function updateVal(fid, type, val) {
+  if (!ev[fid]) ev[fid] = { e: 0, o: 0 };
+  const n = parseFloat(val) || 0;
+
+  if (type === 'e') {
+    ev[fid].e = n;
+    // Only pull Optimal up if Essential is now greater than current Optimal
+    if (n > ev[fid].o) {
+      ev[fid].o = n;
+      const oi = document.getElementById('o_' + fid);
+      if (oi) oi.value = n;
+    }
+  } else {
+    // Optimal change — enforce floor at Essential
+    if (n < ev[fid].e) {
+      ev[fid].o = ev[fid].e;
+      const oi = document.getElementById('o_' + fid);
+      if (oi) {
+        oi.value = ev[fid].e;
+        oi.classList.add('o-warn');
+        setTimeout(() => oi.classList.remove('o-warn'), 1800);
+      }
+      showToast('Optimal cannot be lower than Essential. It has been reset to match.');
+    } else {
+      ev[fid].o = n;
+    }
+  }
+  updateSidebar();
+}
+
+// ═══════════════════════════════════════════
+//  CUSTOM ITEMS
+// ═══════════════════════════════════════════
+function togglePanel(pid) {
+  const p = document.getElementById(pid);
+  const was = p.classList.contains('open');
+  document.querySelectorAll('.add-panel.open').forEach(x => x.classList.remove('open'));
+  if (!was) p.classList.add('open');
+}
+
+function closePanel(pid) {
+  document.getElementById(pid).classList.remove('open');
+}
+
+function addItem(sid) {
+  const lEl = document.getElementById('nl-' + sid);
+  const label = lEl.value.trim();
+  if (!label) {
+    lEl.classList.add('err');
+    setTimeout(() => lEl.classList.remove('err'), 1400);
+    lEl.focus();
+    return;
+  }
+  const aeEl = document.getElementById('nae-' + sid);
+  const feEl = document.getElementById('nfe-' + sid);
+  const aoEl = document.getElementById('nao-' + sid);
+  const foEl = document.getElementById('nfo-' + sid);
+  const rawE = parseFloat(aeEl.value) || 0;
+  const rawO = parseFloat(aoEl.value) || 0;
+  const mE   = rawE / parseFloat(feEl.value);
+  const mO   = rawO / parseFloat(foEl.value);
+  const cid  = 'c' + (++ctr);
+  const fid  = 'cu_' + cid;
+  ev[fid] = { e: Math.ceil(mE), o: Math.ceil(Math.max(mO, mE)) };
+  custom[sid].push({ cid, fid, label });
+  lEl.value = ''; aeEl.value = ''; aoEl.value = '';
+  closePanel('ap-' + sid);
+  renderCustom(sid);
+  updateSidebar();
+}
+
+function renderCustom(sid) {
+  const wrap = document.getElementById('cust-' + sid);
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  (custom[sid] || []).forEach(item => {
+    const row = makeFieldEl(item.fid, item.label, true, item.cid);
+    row.style.borderLeft = '3px solid var(--gold)';
+    row.style.borderRadius = '0 ' + getComputedStyle(document.documentElement).getPropertyValue('--rs').trim() + ' ' + getComputedStyle(document.documentElement).getPropertyValue('--rs').trim() + ' 0';
+    row.style.marginTop = '4px';
+    wrap.appendChild(row);
+  });
+}
+
+function removeItem(cid) {
+  let sid;
+  SECTIONS.forEach(s => {
+    if ((custom[s.id] || []).find(x => x.cid === cid)) sid = s.id;
+  });
+  if (!sid) return;
+  const item = custom[sid].find(x => x.cid === cid);
+  if (item) { delete ev[item.fid]; custom[sid] = custom[sid].filter(x => x.cid !== cid); }
+  renderCustom(sid);
+  updateSidebar();
+}
+
+// ═══════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════
+const LBLS = ['Assessment Baseline','Housing & Utilities','Food, Transport & Health','Lifestyle, Giving & Growth','Results'];
+
+function goTo(n) {
+  const prev = currentStep;
+  currentStep = n;
+
+  // Session tracking
+  if (sessionId) {
+    const isBack = n < prev && prev === 5;
+    logSession({ lastStep: n, ...(isBack ? { adjusted: true } : {}) });
+  }
+
+  for (let i = 1; i <= 5; i++) document.getElementById('s' + i).classList.add('hidden');
+  document.getElementById('s' + n).classList.remove('hidden');
+
+  for (let i = 1; i <= 5; i++) {
+    const d = document.getElementById('dot-' + i);
+    if (i < n)      { d.className = 'dot done'; d.innerHTML = '✓'; }
+    else if (i === n){ d.className = 'dot on';   d.innerHTML = i; }
+    else            { d.className = 'dot';       d.innerHTML = i; }
+  }
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById('ln-' + i).className = i < n ? 'line done' : 'line';
+  }
+  document.getElementById('progLbl').textContent = `Step ${n} of 5 — ${LBLS[n - 1]}`;
+
+  // Sidebar and mobile bar: visible on steps 2–4 only
+  const showLive = (n >= 2 && n <= 4);
+  const sc = document.getElementById('sidebarCol');
+  const mb = document.getElementById('mobileBar');
+  if (showLive) {
+    sc.classList.add('active');
+    mb.classList.add('active');
+    document.body.classList.add('has-bar');
+  } else {
+    sc.classList.remove('active');
+    mb.classList.remove('active');
+    document.body.classList.remove('has-bar');
+  }
+
+  if (n === 5) refreshResults();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ═══════════════════════════════════════════
+//  CALCULATIONS
+// ═══════════════════════════════════════════
+function allFieldIds() {
+  const base   = SECTIONS.flatMap(s => s.fields.map(f => f.id));
+  const custom_ = SECTIONS.flatMap(s => (custom[s.id] || []).map(c => c.fid));
+  return [...base, ...custom_];
+}
+
+function essM() {
+  return allFieldIds().reduce((sum, fid) => sum + (ev[fid]?.e || 0), 0);
+}
+
+function optM() {
+  return allFieldIds().reduce((sum, fid) => sum + (ev[fid]?.o || 0), 0);
+}
+
+function catTotals() {
+  return SECTIONS.map(sec => {
+    const be = sec.fields.reduce((s, f) => s + (ev[f.id]?.e || 0), 0);
+    const bo = sec.fields.reduce((s, f) => s + (ev[f.id]?.o || 0), 0);
+    const ce = (custom[sec.id] || []).reduce((s, c) => s + (ev[c.fid]?.e || 0), 0);
+    const co = (custom[sec.id] || []).reduce((s, c) => s + (ev[c.fid]?.o || 0), 0);
+    return { label: sec.label, e: be + ce, o: bo + co };
+  }).filter(c => c.o > 0 || c.e > 0).sort((a, b) => b.o - a.o);
+}
+
+// ═══════════════════════════════════════════
+//  CURRENCY SYMBOL
+// ═══════════════════════════════════════════
+const LOCALE_CURRENCY = {
+  'en-US':'$','en-CA':'CA$','en-AU':'A$','en-NZ':'NZ$','en-ZA':'R',
+  'en-GB':'£','en-NG':'₦','en-GH':'GH₵','en-KE':'KSh',
+  'ar-SA':'SAR ','ar-AE':'AED ','ar-QA':'QAR ','ar-KW':'KWD ','ar-BH':'BHD ','ar-EG':'E£',
+  'fr-FR':'€','de-DE':'€','es-ES':'€','nl-NL':'€','it-IT':'€','pt-PT':'€',
+  'es-MX':'MX$','pt-BR':'R$',
+  'tr-TR':'₺','ru-RU':'₽','ja-JP':'¥','zh-CN':'¥','zh-TW':'NT$',
+  'ko-KR':'₩','hi-IN':'₹','ms-MY':'RM','ms-SG':'S$',
+};
+function detectCurrency() {
+  const loc = navigator.language || '';
+  if (LOCALE_CURRENCY[loc]) return LOCALE_CURRENCY[loc];
+  const lang = loc.split('-')[0];
+  const match = Object.entries(LOCALE_CURRENCY).find(([k]) => k.startsWith(lang + '-'));
+  return match ? match[1] : '$';
+}
+let currSym = localStorage.getItem('fn_currency') || detectCurrency();
+function setCurrency(sym) {
+  currSym = sym || '$';
+  localStorage.setItem('fn_currency', currSym);
+  // Update income prefix
+  const ip = document.getElementById('incomePfx');
+  if (ip) ip.textContent = currSym;
+  // Re-render all allocation sections so inp-pfx spans update
+  SECTIONS.forEach(buildSection);
+  renderCurrencyPills();
+  updateSidebar();
+  refreshResults();
+}
+const fmt  = n => currSym.trimEnd() + '\u00a0' + Math.round(n).toLocaleString();
+const fmtS = n => n >= 0 ? '+' + fmt(n) : '-' + fmt(Math.abs(n));
+
+function getIncomeM() {
+  return parseFloat(document.getElementById('incomeInput')?.value) || 0;
+}
+
+// ═══════════════════════════════════════════
+//  SIDEBAR UPDATE
+// ═══════════════════════════════════════════
+function updateSidebar() {
+  const em  = essM();
+  const om  = optM();
+  const gap = om - em;
+  const inc = getIncomeM();
+  const dv  = period === 'm' ? 1 : 12;
+
+  // Sidebar values
+  const sbEss = document.getElementById('sb-ess');
+  const sbOpt = document.getElementById('sb-opt');
+  const sbGap = document.getElementById('sb-gap');
+  const sbInc = document.getElementById('sb-inc');
+  const sbPh  = document.getElementById('sb-phase');
+  const sbCatName = document.getElementById('sb-cat-name');
+  const sbCatVal  = document.getElementById('sb-cat-val');
+
+  if (sbEss) sbEss.textContent = fmt(em * dv);
+  if (sbOpt) sbOpt.textContent = fmt(om * dv);
+  if (sbGap) sbGap.textContent = fmt(gap * dv);
+  if (sbInc) sbInc.textContent = inc > 0 ? fmt(inc * dv) : '—';
+
+  // Phase badge
+  if (sbPh) {
+    if (inc <= 0) {
+      sbPh.className = 'sb-phase-badge none';
+      sbPh.textContent = 'Not assessed';
+    } else if (inc < em) {
+      sbPh.className = 'sb-phase-badge stab';
+      sbPh.textContent = 'Stability';
+    } else if (inc < om) {
+      sbPh.className = 'sb-phase-badge build';
+      sbPh.textContent = 'Build';
+    } else {
+      sbPh.className = 'sb-phase-badge auto';
+      sbPh.textContent = 'Autonomy';
+    }
+  }
+
+  // Largest allocation category
+  const cats = catTotals();
+  if (cats.length > 0 && sbCatName) {
+    sbCatName.textContent = cats[0].label;
+    if (sbCatVal) sbCatVal.textContent = fmt(cats[0].o * dv) + ' optimal';
+  } else if (sbCatName) {
+    sbCatName.textContent = '—';
+    if (sbCatVal) sbCatVal.textContent = '';
+  }
+
+  // Mobile bar
+  const mbEss = document.getElementById('mb-ess');
+  const mbOpt = document.getElementById('mb-opt');
+  const mbGap = document.getElementById('mb-gap');
+  if (mbEss) mbEss.textContent = fmt(em);
+  if (mbOpt) mbOpt.textContent = fmt(om);
+  if (mbGap) mbGap.textContent = fmt(gap);
+}
+
+// ═══════════════════════════════════════════
+//  REFRESH RESULTS
+// ═══════════════════════════════════════════
+function refreshResults() {
+  const em  = essM();
+  const om  = optM();
+  const inc = getIncomeM();
+  const ea  = em  * 12;
+  const oa  = om  * 12;
+  const ia  = inc * 12;
+  const m   = period === 'm';
+
+  // Three number cards — values
+  document.getElementById('nc-income').textContent  = inc > 0 ? fmt(m ? inc : ia) : '—';
+  document.getElementById('nc-income-p').textContent = m ? '/ month' : '/ year';
+  document.getElementById('nc-income-s').textContent = inc > 0
+    ? (m ? fmt(ia) + ' per year' : fmt(inc) + ' per month')
+    : 'Enter income above';
+  document.getElementById('nc-ess').textContent  = fmt(m ? em : ea);
+  document.getElementById('nc-ess-p').textContent = m ? '/ month' : '/ year';
+  document.getElementById('nc-ess-s').textContent = m ? fmt(ea) + ' per year' : fmt(em) + ' per month';
+  document.getElementById('nc-opt').textContent  = fmt(m ? om : oa);
+  document.getElementById('nc-opt-p').textContent = m ? '/ month' : '/ year';
+  document.getElementById('nc-opt-s').textContent = m ? fmt(oa) + ' per year' : fmt(om) + ' per month';
+
+  // Card order by phase
+  const ci = document.getElementById('card-income');
+  const ce = document.getElementById('card-ess');
+  const co = document.getElementById('card-opt');
+  if (inc <= 0 || inc < em) {
+    // No income or Stability — Income first (most urgent)
+    ci.style.order = 1; ce.style.order = 2; co.style.order = 3;
+  } else if (inc < om) {
+    // Build — Income between the two targets
+    ce.style.order = 1; ci.style.order = 2; co.style.order = 3;
+  } else {
+    // Autonomy — Income rightmost (beyond both targets)
+    ce.style.order = 1; co.style.order = 2; ci.style.order = 3;
+  }
+
+  // Render sub-sections
+  renderAutoScore(inc, om);
+  renderPhase(inc, em, om, m);
+  renderNextMove(inc, em, om, m);
+  renderGap(inc, em, om, m);
+  renderPath(inc, em, om, m);
+  renderChart(m);
+  updateSidebar();
+  showReportSection();
+
+  // Share card figures (always annual)
+  document.getElementById('sp-opt').textContent  = fmt(oa);
+  document.getElementById('sp-ess').textContent  = fmt(ea);
+  document.getElementById('sp-onum').textContent = fmt(oa);
+
+  // Autonomy Score on share badge — only show if income entered
+  const scoreCol = document.getElementById('sp-score-col');
+  const scoreEl  = document.getElementById('sp-score');
+  if (inc > 0 && scoreCol && scoreEl) {
+    const s = autoScore(inc, om);
+    const c = s >= 75 ? 'var(--auto)' : s >= 33 ? 'var(--build)' : 'var(--stab)';
+    scoreEl.textContent  = s + ' / 100';
+    scoreEl.style.color  = c;
+    scoreCol.style.display = '';
+  } else if (scoreCol) {
+    scoreCol.style.display = 'none';
+  }
+}
+
+function setPeriod(p, btn) {
+  period = p;
+  document.querySelectorAll('.ptog button').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  refreshResults();
+}
+
+function onIncomeBlur() {
+  const inc = getIncomeM();
+  if (inc === lastLoggedIncome) return; // no change, skip
+  lastLoggedIncome = inc;
+  if (inc > 0) logCompletion();
+}
+
+// ═══════════════════════════════════════════
+//  AUTONOMY SCORE
+// ═══════════════════════════════════════════
+function autoScore(inc, om) {
+  if (!om || om <= 0) return 0;
+  return Math.min(100, Math.round((inc / om) * 100));
+}
+
+function renderAutoScore(inc, om) {
+  const el = document.getElementById('autoScore');
+  if (!el) return;
+  if (!inc || inc <= 0 || !om || om <= 0) { el.innerHTML = ''; return; }
+
+  const score   = autoScore(inc, om);
+  const R       = 46;
+  const cx      = 55;
+  const cy      = 55;
+  const circumf = 2 * Math.PI * R;
+  const pct     = score / 100;
+
+  // Stroke colour: interpolate stab→build→auto based on score
+  let strokeCol;
+  if (score < 50)      strokeCol = '#4a9fd4'; // build blue-ish for low
+  if (score < 33)      strokeCol = '#e05c5c'; // stab red for very low
+  if (score >= 50)     strokeCol = '#4a9fd4'; // build
+  if (score >= 75)     strokeCol = '#4caf82'; // auto green
+
+  const desc = inc >= om
+    ? `Your income fully covers your Optimal Allocation. You have reached <strong>financial autonomy</strong>.`
+    : `Your current income covers <strong>${score}%</strong> of your Optimal Allocation Requirement. ${100 - score} points remain to full autonomy.`;
+
+  el.innerHTML = `
+    <div class="ascore-card">
+      <div class="ascore-circle-wrap">
+        <svg class="ascore-svg" viewBox="0 0 110 110">
+          <circle class="ascore-track" cx="${cx}" cy="${cy}" r="${R}"/>
+          <circle class="ascore-fill" id="ascoreFill"
+            cx="${cx}" cy="${cy}" r="${R}"
+            stroke="${strokeCol}"
+            stroke-dasharray="${circumf}"
+            stroke-dashoffset="${circumf}"/>
+        </svg>
+        <div class="ascore-center">
+          <div class="ascore-num" id="ascoreNum">0</div>
+          <div class="ascore-denom">/ 100</div>
+        </div>
+      </div>
+      <div class="ascore-right">
+        <div class="ascore-label">◆ Autonomy Score</div>
+        <div class="ascore-desc">${desc}</div>
+        <div class="ascore-scale">
+          <span>0</span>
+          <div class="ascore-scale-bar">
+            <div class="ascore-scale-marker" id="ascoreMarker" style="left:0%"></div>
+          </div>
+          <span>100</span>
+        </div>
+      </div>
+    </div>`;
+
+  // Animate after paint — stroke draws in, number counts up together
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      // Stroke animation (CSS transition handles it)
+      const fill = document.getElementById('ascoreFill');
+      if (fill) fill.style.strokeDashoffset = circumf * (1 - pct);
+
+      // Marker slide
+      const marker = document.getElementById('ascoreMarker');
+      if (marker) marker.style.left = score + '%';
+
+      // Number count-up
+      const numEl = document.getElementById('ascoreNum');
+      if (!numEl) return;
+      const duration = 1200;
+      const start    = performance.now();
+      function tick(now) {
+        const t   = Math.min(1, (now - start) / duration);
+        const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+        numEl.textContent = Math.round(ease * score);
+        if (t < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════
+//  PHASE DIAGNOSTIC
+// ═══════════════════════════════════════════
+function renderPhase(inc, em, om, m) {
+  const diag = document.getElementById('phaseDiag');
+  if (inc <= 0) { diag.innerHTML = ''; return; }
+  const dv = m ? 1 : 12;
+  let cls, badge, title, text, focuses, phaseKey;
+
+  if (inc < em) {
+    cls = 'stab'; phaseKey = 'stability';
+    badge = 'Phase 01 — Stability';
+    title = 'Stability Phase';
+    const shortfall = fmt((em - inc) * dv);
+    text  = `Current income falls <strong>${shortfall}${m ? '/month' : '/year'}</strong> short of the Essential Allocation Requirement of <strong>${fmt(em * dv)}</strong>. Essential obligations are not fully covered. All financial decisions should be directed toward closing this gap. The structural priority is income expansion and fragility reduction.`;
+    focuses = [
+      'Increase income — primary objective',
+      'Reduce fixed obligation exposure',
+      'Develop high-leverage transferable skills',
+      'Triage current cash flow allocation',
+    ];
+  } else if (inc < om) {
+    cls = 'build'; phaseKey = 'build';
+    badge = 'Phase 02 — Build';
+    title = 'Build Phase';
+    const shortfall = fmt((om - inc) * dv);
+    text  = `Essential obligations are fully covered. Current income falls <strong>${shortfall}${m ? '/month' : '/year'}</strong> short of the Optimal Allocation Requirement of <strong>${fmt(om * dv)}</strong>. The foundational structure is stable. The strategic focus shifts to margin expansion and allocation efficiency.`;
+    focuses = [
+      'Expand income — active pursuit',
+      'Improve allocation efficiency',
+      'Build structured investment discipline',
+      'Deploy skill leverage for income growth',
+    ];
+  } else {
+    cls = 'auto'; phaseKey = 'autonomy';
+    badge = 'Phase 03 — Autonomy';
+    title = 'Autonomy Phase';
+    const surplus = fmt((inc - om) * dv);
+    text  = `Income meets or exceeds the Optimal Allocation Requirement of <strong>${fmt(om * dv)}</strong>. All designed allocations are funded. A surplus of <strong>${surplus}${m ? '/month' : '/year'}</strong> is available for strategic deployment. The focus transitions from income acquisition to capital allocation and time control.`;
+    focuses = [
+      'Exercise time control and reduce obligations',
+      'Reduce income-dependent structural risk',
+      'Build and protect optionality',
+      'Deploy surplus capital strategically',
+    ];
+  }
+
+  diag.innerHTML = `
+    <div class="phase-card ${cls}">
+      <div class="phase-badge">◆ ${badge}</div>
+      <div class="phase-title">${title}</div>
+      <div class="phase-text">${text}</div>
+      <div class="focus-grid ${cls}">
+        ${focuses.map(f => `
+          <div class="focus-item">
+            <div class="focus-dot"></div>${f}
+          </div>`).join('')}
+      </div>
+      <div class="phase-cta">
+        <div class="phase-cta-text">Your strategy for the ${title} →</div>
+        <a class="phase-cta-btn" href="${PHASE_URLS[phaseKey]}" target="_blank" rel="noopener">
+          ${PHASE_CTA[phaseKey]}
+        </a>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════
+//  NEXT STRATEGIC MOVE
+// ═══════════════════════════════════════════
+function renderNextMove(inc, em, om, m) {
+  const nm = document.getElementById('nextMove');
+  if (inc <= 0 || inc >= om) { nm.innerHTML = ''; return; }
+  const dv = m ? 1 : 12;
+  let targetLabel, targetVal, required;
+
+  if (inc < em) {
+    targetLabel = 'Essential Allocation Requirement';
+    targetVal   = em;
+    required    = em - inc;
+  } else {
+    targetLabel = 'Optimal Allocation Requirement';
+    targetVal   = om;
+    required    = om - inc;
+  }
+
+  nm.innerHTML = `
+    <div class="next-move">
+      <div class="nm-hdr">Next Strategic Move</div>
+      <div class="nm-target-label">Target</div>
+      <div class="nm-target-val">${targetLabel} — <strong>${fmt(targetVal * dv)}</strong></div>
+      <div class="nm-req-label">Required Margin Improvement</div>
+      <div class="nm-req-val">${fmt(required * dv)}<span style="font-family:'DM Mono',monospace;font-size:1rem;font-weight:300;color:var(--muted)"> ${m ? '/ month' : '/ year'}</span></div>
+      <div class="nm-req-sub">This is the additional monthly margin required to reach the ${targetLabel.toLowerCase()}. It can be achieved through any combination of the levers below.</div>
+      <div class="nm-levers">
+        <div class="nm-lever"><div class="nm-lever-dot"></div>Increase take-home income</div>
+        <div class="nm-lever"><div class="nm-lever-dot"></div>Reduce fixed obligations</div>
+        <div class="nm-lever"><div class="nm-lever-dot"></div>Improve allocation efficiency</div>
+      </div>
+      <div class="nm-footer">Identify the single category creating the largest structural constraint and address it first.</div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════
+//  GAP ANALYSIS
+// ═══════════════════════════════════════════
+function renderGap(inc, em, om, m) {
+  const gs  = document.getElementById('gapSection');
+  const dv  = m ? 1 : 12;
+  const eoGap     = om - em;
+  const incToEss  = em - inc;
+  const incToOpt  = om - inc;
+  const pctToEss  = em > 0 ? Math.min(100, Math.round((inc / em)  * 100)) : 0;
+  const pctToOpt  = om > 0 ? Math.min(100, Math.round((inc / om)  * 100)) : 0;
+
+  const shortfallOpt = inc > 0 ? incToOpt : null;
+
+  gs.innerHTML = `
+    <div class="section-hdr-label">Gap Analysis</div>
+    <div class="gap-grid">
+
+      <div class="gap-card">
+        <div class="gap-label">Optimal Shortfall</div>
+        <div class="gap-amount ${inc > 0 ? (inc >= om ? 'pos' : 'neg') : 'neu'}">
+          ${inc > 0 ? fmt(Math.abs(incToOpt) * dv) : '—'}
+        </div>
+        <div class="gap-sub">
+          ${inc > 0
+            ? (inc >= om
+                ? 'Optimal Allocation Requirement is met.'
+                : 'Additional income or reduction in fixed obligations required to reach the designed life.')
+            : 'Enter income above to calculate shortfall.'}
+        </div>
+      </div>
+
+      <div class="gap-card">
+        <div class="gap-label">Essential ↔ Optimal Range</div>
+        <div class="gap-amount neu">${fmt(eoGap * dv)}</div>
+        <div class="gap-sub">${m ? 'per month' : 'per year'} — the margin between your two allocation levels.</div>
+      </div>
+
+      ${inc > 0 ? `
+      <div class="gap-card">
+        <div class="gap-label">Essential Coverage</div>
+        <div class="gap-amount ${pctToEss >= 100 ? 'pos' : 'neg'}">${pctToEss}%</div>
+        <div class="gap-sub">of Essential Allocation Requirement met.</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-track">
+            <div class="progress-fill" style="background:var(--ess);width:0" data-pct="${Math.min(100, pctToEss)}"></div>
+          </div>
+          <div class="progress-pct">
+            ${pctToEss >= 100
+              ? 'Essential threshold achieved.'
+              : fmt(Math.max(0, incToEss) * dv) + ' remaining'}
+          </div>
+        </div>
+      </div>
+
+      <div class="gap-card">
+        <div class="gap-label">Optimal Progress</div>
+        <div class="gap-amount ${pctToOpt >= 100 ? 'pos' : 'neg'}">${pctToOpt}%</div>
+        <div class="gap-sub">of Optimal Allocation Requirement met.</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-track">
+            <div class="progress-fill" style="background:var(--gold);width:0" data-pct="${Math.min(100, pctToOpt)}"></div>
+          </div>
+          <div class="progress-pct">
+            ${pctToOpt >= 100
+              ? 'Optimal threshold achieved.'
+              : fmt(Math.max(0, incToOpt) * dv) + ' remaining'}
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
+    </div>`;
+
+  setTimeout(() => {
+    document.querySelectorAll('.progress-fill').forEach(b => {
+      b.style.transition = 'width 1s cubic-bezier(.4,0,.2,1)';
+      b.style.width = b.dataset.pct + '%';
+    });
+  }, 80);
+}
+
+// ═══════════════════════════════════════════
+//  ALLOCATION CHART
+// ═══════════════════════════════════════════
+function renderChart(m) {
+  const cats  = catTotals();
+  const maxV  = Math.max(...cats.map(c => c.o), 1);
+  const totalO = cats.reduce((s, c) => s + c.o, 0);
+  const cb    = document.getElementById('chartBars');
+  const dv    = m ? 1 : 12;
+  cb.innerHTML = '';
+  cats.forEach(cat => {
+    const pe   = Math.round((cat.e / maxV) * 100);
+    const po   = Math.round((cat.o / maxV) * 100);
+    const pctOfTotal = totalO > 0 ? Math.round((cat.o / totalO) * 100) : 0;
+    const essRatio   = cat.o > 0  ? Math.round((cat.e / cat.o) * 100)  : 0;
+    const row = document.createElement('div');
+    row.className = 'chart-item';
+    row.innerHTML = `
+      <div class="chart-cat">
+        <span class="chart-cat-name">${cat.label}</span>
+        <span style="display:flex;gap:10px;align-items:baseline">
+          <span class="chart-cat-pct" style="color:var(--pct-budget)">${pctOfTotal}%</span>
+          ${essRatio > 0 ? `<span class="chart-cat-ess" style="color:var(--pct-ess)">${essRatio}% ess</span>` : ''}
+        </span>
+      </div>
+      <div>
+        <div class="chart-bars">
+          <div class="chart-track"><div class="chart-bar bar-e" style="width:0" data-pct="${pe}"></div></div>
+          <div class="chart-track"><div class="chart-bar bar-o" style="width:0" data-pct="${po}"></div></div>
+        </div>
+        <div class="chart-vals">
+          <span class="chart-val e">${fmt(cat.e * dv)}</span>
+          <span class="chart-val" style="color:var(--dim)">vs</span>
+          <span class="chart-val o">${fmt(cat.o * dv)}</span>
+        </div>
+      </div>`;
+    cb.appendChild(row);
+  });
+  setTimeout(() => {
+    document.querySelectorAll('.chart-bar').forEach(b => {
+      b.style.width = b.dataset.pct + '%';
+    });
+  }, 80);
+}
+
+// ═══════════════════════════════════════════
+//  PATH TO AUTONOMY
+// ═══════════════════════════════════════════
+function fmtDuration(months) {
+  if (months <= 0) return 'Already achieved';
+  if (months < 1)  return 'Less than 1 month';
+  const y = Math.floor(months / 12);
+  const m = Math.round(months % 12);
+  if (y === 0) return m + ' month' + (m !== 1 ? 's' : '');
+  if (m === 0) return y + ' year' + (y !== 1 ? 's' : '');
+  return y + ' yr ' + m + ' mo';
+}
+
+function renderPath(inc, em, om, m) {
+  const ps  = document.getElementById('pathSection');
+  if (!ps) return;
+  const dv  = m ? 1 : 12;
+
+  // Autonomy surplus framing
+  if (inc >= om) {
+    const surplus = inc - om;
+    ps.innerHTML = `
+      <div class="surplus-section">
+        <div class="surplus-label">◆ Autonomy Surplus</div>
+        <div class="surplus-amount">${fmt(surplus * dv)}<span style="font-family:'DM Mono',monospace;font-size:1rem;font-weight:300;color:var(--auto);margin-left:6px">${m ? '/ mo' : '/ yr'}</span></div>
+        <div class="surplus-sub">Your income exceeds your Optimal Allocation Requirement. This surplus is available for intentional deployment.</div>
+        <div class="surplus-options">
+          <div class="surplus-option"><strong>Accelerate</strong>Increase investment rate and compound capital faster.</div>
+          <div class="surplus-option"><strong>Reduce Exposure</strong>Work less, take on fewer obligations, protect time.</div>
+          <div class="surplus-option"><strong>Expand Giving</strong>Fund causes, family, or community at a higher level.</div>
+          <div class="surplus-option"><strong>Upgrade Life</strong>Revisit your Optimal allocations — your designed life may have grown.</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (inc <= 0) { ps.innerHTML = ''; return; }
+
+  const isStab   = inc < em;
+  const essGapM  = em - inc;   // always monthly
+  const optGapM  = om - inc;   // always monthly
+  const scenarios = [500, 1000, 2000];
+
+  // Table header and rows
+  const colClass = isStab ? 'stab-cols' : 'build-cols';
+  const headCols = isStab
+    ? `<span>Monthly Growth</span><span>Time to Essential</span><span>Time to Optimal</span>`
+    : `<span>Monthly Growth</span><span>Time to Optimal</span>`;
+
+  const rows = scenarios.map(g => {
+    const monthsToOpt = optGapM / g;
+    const monthsToEss = isStab ? essGapM / g : 0;
+    const essCell = isStab
+      ? `<span class="path-time ess">${fmtDuration(monthsToEss)}</span>`
+      : '';
+    return `
+      <div class="path-row ${colClass}">
+        <span class="path-growth">+${currSym}${g.toLocaleString()}/mo</span>
+        ${essCell}
+        <span class="path-time">${fmtDuration(monthsToOpt)}</span>
+      </div>`;
+  }).join('');
+
+  // Intro copy
+  const gapFmt = fmt(optGapM * dv);
+  const introCopy = isStab
+    ? `Your income currently falls <strong>${fmt(essGapM * dv)}${m ? '/month' : '/year'}</strong> short of your Essential Allocation Requirement, and <strong>${gapFmt}${m ? '/month' : '/year'}</strong> short of your Optimal. The table below shows how both milestones shift under different growth scenarios.`
+    : `Your Optimal Allocation Requirement is <strong>${gapFmt}${m ? '/month' : '/year'}</strong> above your current income. The table below shows how long it would take to close that gap under different growth scenarios.`;
+
+  ps.innerHTML = `
+    <div class="path-section">
+      <div class="section-hdr-label">Your Path to Autonomy</div>
+      <div class="path-intro">${introCopy}</div>
+
+      <div class="path-table-wrap">
+        <div class="path-table-head ${colClass}">${headCols}</div>
+        ${rows}
+      </div>
+
+      <div class="path-footer">Most users reach their Optimal Allocation faster by combining income growth with allocation optimisation — revisiting your numbers periodically keeps the plan accurate.</div>
+
+      <div class="path-custom">
+        <div class="path-custom-label">Try your own growth scenario</div>
+        <div class="path-custom-row">
+          <div class="path-custom-input-wrap">
+            <span class="path-custom-pfx">+${currSym}</span>
+            <input class="path-custom-input" type="number" min="1" step="100"
+              placeholder="amount"
+              oninput="updatePathCustom(this.value, ${essGapM}, ${optGapM}, ${isStab}, '${m ? 'm' : 'a'}')">
+          </div>
+          <span style="font-size:.78rem;color:var(--dim);white-space:nowrap">per month</span>
+        </div>
+        <div class="path-custom-result" id="pathCustomResult"></div>
+      </div>
+    </div>`;
+}
+
+function updatePathCustom(val, essGapM, optGapM, isStab, period) {
+  const el  = document.getElementById('pathCustomResult');
+  if (!el) return;
+  const g   = parseFloat(val);
+  if (!g || g <= 0) { el.innerHTML = ''; return; }
+  const toOpt = fmtDuration(optGapM / g);
+  if (isStab) {
+    const toEss = fmtDuration(essGapM / g);
+    el.innerHTML = `At <strong>+${currSym}${Math.round(g).toLocaleString()}/month</strong>: Essential covered in <strong style="color:var(--ess)">${toEss}</strong> · Optimal reached in <strong>${toOpt}</strong>`;
+  } else {
+    el.innerHTML = `At <strong>+${currSym}${Math.round(g).toLocaleString()}/month</strong>: Optimal reached in <strong>${toOpt}</strong>`;
+  }
+}
+// ═══════════════════════════════════════════
+//  FIREBASE DATA LAYER
+// ═══════════════════════════════════════════
+let sessionCompleted = false; // prevents double-fire of logCompletion per session
+
+function logSession(updates) {
+  if (!sessionId) return;
+  try {
+    const raw = localStorage.getItem('fn_sessions');
+    const sessions = raw ? JSON.parse(raw) : {};
+    const existing = sessions[sessionId] || {
+      id: sessionId, startedAt: sessionStart || Date.now(),
+      lastStep: 1, completed: false, adjusted: false,
+    };
+    // Never let 'started' (boolean from init call) overwrite 'startedAt' timestamp
+    const { started, ...safeUpdates } = updates;
+    Object.assign(existing, safeUpdates);
+    sessions[sessionId] = existing;
+    localStorage.setItem('fn_sessions', JSON.stringify(sessions));
+
+    // Write to Firestore — await _fbReady to avoid race on page load
+    const snap = { ...existing }; // capture before async delay
+    Promise.resolve(window._fbReady).then(() => {
+      const fb = window._fb;
+      if (fb) {
+        fb.setDoc(fb.doc(fb.db, 'sessions', sessionId), snap, { merge: true })
+          .catch(e => console.warn('logSession Firestore:', e));
+      }
+    });
+  } catch(e) { console.warn('logSession:', e); }
+}
+
+async function logCompletion() {
+  if (sessionCompleted) return; // only fire once per session
+  sessionCompleted = true;
+
+  try {
+    // Wait for Firebase to be ready before attempting write
+    if (window._fbReady) await window._fbReady;
+    const em  = essM();
+    const om  = optM();
+    const inc = getIncomeM();
+    if (inc <= 0) { sessionCompleted = false; return; }
+
+    const phase = inc < em ? 'stability' : inc < om ? 'build' : 'autonomy';
+    const catT  = catTotals();
+    const customLabels = SECTIONS.flatMap(s => (custom[s.id] || []).map(c => c.label));
+
+    const locale  = navigator.language || '';
+    const country = localeToCountry(locale);
+    const screen  = window.innerWidth < 640 ? 'mobile' : window.innerWidth < 1024 ? 'tablet' : 'desktop';
+    const browser = (()=>{
+      const ua = navigator.userAgent;
+      if (ua.includes('Edg'))     return 'Edge';
+      if (ua.includes('Chrome'))  return 'Chrome';
+      if (ua.includes('Firefox')) return 'Firefox';
+      if (ua.includes('Safari'))  return 'Safari';
+      return 'Other';
+    })();
+    const timeOnPage = sessionStart ? Math.round((Date.now() - sessionStart) / 1000) : 0;
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const fb = window._fb;
+    if (fb) {
+      // Sanitise a string for use as a Firestore field path segment
+      // Firestore field names cannot contain: . / [ ] * ` or start with __
+      // We also strip spaces, emoji, and special chars to be safe
+      const fk = s => s
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents
+        .replace(/[^\w]/g, '_')   // replace anything not [a-zA-Z0-9_] with _
+        .replace(/_+/g, '_')      // collapse consecutive underscores
+        .replace(/^_|_$/g, '')    // trim leading/trailing underscores
+        .toLowerCase()
+        || 'unknown';
+
+      const aggRef = fb.doc(fb.db, 'completions', 'aggregate');
+      const inc_map = {
+        count:    fb.increment(1),
+        totalEss: fb.increment(em),
+        totalOpt: fb.increment(om),
+        totalInc: fb.increment(inc),
+        incCount: fb.increment(1),
+        totalTime: fb.increment(timeOnPage),
+        [`phases.${phase}`]:           fb.increment(1),
+        [`geo.${fk(country)}`]:        fb.increment(1),
+        [`devices.${fk(screen)}`]:     fb.increment(1),
+        [`browsers.${fk(browser)}`]:   fb.increment(1),
+        [`byDay.${today}`]:            fb.increment(1),
+      };
+      catT.forEach(c => {
+        const ck = fk(c.label);
+        inc_map[`cats.${ck}.e`] = fb.increment(Math.round(c.e));
+        inc_map[`cats.${ck}.o`] = fb.increment(Math.round(c.o));
+        inc_map[`cats.${ck}.n`] = fb.increment(1);
+        // Store display name separately so dashboard can show it prettily
+        inc_map[`catNames.${ck}`] = c.label;
+      });
+      QUIZ.forEach(q => {
+        const i = qsel[q.id];
+        if (i !== undefined) {
+          inc_map[`quiz.${fk(q.id)}.${i}`] = fb.increment(1);
+        }
+      });
+      customLabels.forEach(l => {
+        const ck = fk(l);
+        inc_map[`customItems.${ck}`] = fb.increment(1);
+        inc_map[`customItemNames.${ck}`] = l; // preserve display name
+      });
+      // Store geo display names for dashboard rendering
+      inc_map[`geoNames.${fk(country)}`] = country;
+
+      await fb.setDoc(aggRef, inc_map, { merge: true });
+    } else {
+      // Fallback: localStorage if Firebase unavailable
+      const raw  = localStorage.getItem('fn_completions');
+      const data = raw ? JSON.parse(raw) : {};
+      data.count      = (data.count      || 0) + 1;
+      data.totalEss   = (data.totalEss   || 0) + em;
+      data.totalOpt   = (data.totalOpt   || 0) + om;
+      data.totalInc   = (data.totalInc   || 0) + inc;
+      data.incCount   = (data.incCount   || 0) + 1;
+      data.totalTime  = (data.totalTime  || 0) + timeOnPage;
+      data.phases     = data.phases   || {};
+      data.geo        = data.geo      || {};
+      data.devices    = data.devices  || {};
+      data.browsers   = data.browsers || {};
+      data.cats       = data.cats     || {};
+      data.customItems= data.customItems || {};
+      data.byDay      = data.byDay    || {};
+      data.phases[phase]    = (data.phases[phase]    || 0) + 1;
+      data.geo[country]     = (data.geo[country]     || 0) + 1;
+      data.devices[screen]  = (data.devices[screen]  || 0) + 1;
+      data.browsers[browser]= (data.browsers[browser]|| 0) + 1;
+      data.byDay[today]     = (data.byDay[today]     || 0) + 1;
+      catT.forEach(c => {
+        if (!data.cats[c.label]) data.cats[c.label] = { e:0, o:0, n:0 };
+        data.cats[c.label].e += c.e;
+        data.cats[c.label].o += c.o;
+        data.cats[c.label].n += 1;
+      });
+      customLabels.forEach(l => {
+        const key = l.toLowerCase().trim();
+        data.customItems[key] = (data.customItems[key] || 0) + 1;
+      });
+      localStorage.setItem('fn_completions', JSON.stringify(data));
+    }
+
+    logSession({ completed: true, lastStep: 5 });
+
+  } catch(e) {
+    console.warn('logCompletion:', e);
+    sessionCompleted = false; // allow retry on error
+  }
+}
+
+// ═══════════════════════════════════════════
+//  STORAGE HELPER (localStorage fallback only)
+// ═══════════════════════════════════════════
+async function safeGet(key) {
+  try {
+    const val = localStorage.getItem(key);
+    if (val === null) return null;
+    return { value: val };
+  } catch(e) { return null; }
+}
+
+// ═══════════════════════════════════════════
+//  EMAIL CAPTURE — FULFILLMENT REPORT
+// ═══════════════════════════════════════════
+function showReportSection() {
+  const el = document.getElementById('reportSection');
+  if (el) el.style.display = '';
+}
+
+async function submitReport() {
+  const emailEl  = document.getElementById('reportEmail');
+  const btnEl    = document.getElementById('reportBtn');
+  const statusEl = document.getElementById('reportStatus');
+  const email    = emailEl?.value?.trim();
+
+  if (!email || !email.includes('@')) {
+    statusEl.textContent = 'Please enter a valid email address.';
+    statusEl.className   = 'report-status err';
+    return;
+  }
+
+  btnEl.disabled    = true;
+  btnEl.textContent = 'Sending…';
+  statusEl.textContent = '';
+  statusEl.className   = 'report-status';
+
+  const em    = essM();
+  const om    = optM();
+  const inc   = getIncomeM();
+  const m     = period === 'monthly';
+  const ph    = inc >= om ? 'autonomy' : inc >= em ? 'build' : 'stability';
+  const score = autoScore(inc, om);
+
+  try {
+    const res = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        essential: em,
+        optimal:   om,
+        income:    inc,
+        score,
+        phase:     ph,
+        currency:  currSym,
+        period:    m ? 'monthly' : 'annual',
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      btnEl.textContent    = '✓ Report Sent';
+      statusEl.textContent = 'Check your inbox — your Fulfillment Report is on its way.';
+      statusEl.className   = 'report-status ok';
+      emailEl.disabled     = true;
+    } else {
+      throw new Error(data.error || 'Unknown error');
+    }
+  } catch (err) {
+    btnEl.disabled    = false;
+    btnEl.textContent = 'Send My Report';
+    statusEl.textContent = 'Something went wrong. Please try again.';
+    statusEl.className   = 'report-status err';
+    console.error('Report submit error:', err);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  SHARE
+// ═══════════════════════════════════════════
+function showShare() {
+  const s = document.getElementById('shareSection');
+  s.classList.remove('hidden');
+  s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function copyBadgeText() {
+  const em    = essM();
+  const om    = optM();
+  const inc   = getIncomeM();
+  const score = autoScore(inc, om);
+  const txt = [
+    'My Fulfillment Number — calculated.',
+    '',
+    'Optimal Number: '   + fmt(om * 12) + '/year (' + fmt(om) + '/month)',
+    'Essential Number: ' + fmt(em * 12) + '/year (' + fmt(em) + '/month)',
+    inc > 0 ? 'Current income: ' + fmt(inc * 12) + '/year' : '',
+    inc > 0 ? 'Autonomy Score: ' + score + ' / 100' : '',
+    '',
+    'The Fulfillment Number is the exact income required to fund the life you have designed.',
+    'Calculate yours: fulfillmentnumber.com',
+  ].filter(Boolean).join('\n');
+  navigator.clipboard.writeText(txt)
+    .then(() => showToast('Badge text copied to clipboard.'))
+    .catch(() => prompt('Copy this text:', txt));
+}
+
+function copyBadgeImage(btn) {
+  const em = essM();
+  const om = optM();
+  const W = 760, H = 440;
+  const canvas = document.getElementById('badgeCanvas');
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0c0c18');
+  bg.addColorStop(1, '#161008');
+  ctx.fillStyle = bg;
+  roundRect(ctx, 0, 0, W, H, 28);
+  ctx.fill();
+
+  // Gold border
+  ctx.strokeStyle = 'rgba(200,168,75,0.45)';
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, 1, 1, W - 2, H - 2, 27);
+  ctx.stroke();
+
+  // Brand label
+  ctx.fillStyle = '#c8a84b';
+  ctx.font = '500 13px "DM Mono", monospace';
+  ctx.letterSpacing = '6px';
+  ctx.fillText('THE FULFILLMENT NUMBER™', 44, 62);
+  ctx.letterSpacing = '0px';
+
+  // Subtitle
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.font = '300 18px "Georgia", serif';
+  ctx.fillText('Annual income requirement — Optimal level', 44, 100);
+
+  // Big optimal number
+  const optAnn = fmt(om * 12);
+  const numGrad = ctx.createLinearGradient(44, 130, 44 + 420, 230);
+  numGrad.addColorStop(0, '#ede9e3');
+  numGrad.addColorStop(1, '#d4af60');
+  ctx.fillStyle = numGrad;
+  ctx.font = 'bold 92px "Georgia", serif';
+  ctx.fillText(optAnn, 44, 218);
+
+  // Divider
+  ctx.strokeStyle = 'rgba(200,168,75,0.22)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(44, 260);
+  ctx.lineTo(W - 44, 260);
+  ctx.stroke();
+
+  // Essential block
+  ctx.fillStyle = '#7ecfc0';
+  ctx.font = '500 11px "DM Mono", monospace';
+  ctx.letterSpacing = '3px';
+  ctx.fillText('ESSENTIAL', 44, 300);
+  ctx.letterSpacing = '0px';
+  ctx.font = '600 28px "Georgia", serif';
+  ctx.fillStyle = '#7ecfc0';
+  ctx.fillText(fmt(em * 12), 44, 336);
+  ctx.font = '300 14px "Georgia", serif';
+  ctx.fillStyle = 'rgba(126,207,192,0.7)';
+  ctx.fillText(fmt(em) + ' / month', 44, 360);
+
+  // Optimal block
+  const ox = 280;
+  ctx.fillStyle = '#c8a84b';
+  ctx.font = '500 11px "DM Mono", monospace';
+  ctx.letterSpacing = '3px';
+  ctx.fillText('OPTIMAL', ox, 300);
+  ctx.letterSpacing = '0px';
+  ctx.font = '600 28px "Georgia", serif';
+  ctx.fillStyle = '#d4af60';
+  ctx.fillText(fmt(om * 12), ox, 336);
+  ctx.font = '300 14px "Georgia", serif';
+  ctx.fillStyle = 'rgba(212,175,96,0.7)';
+  ctx.fillText(fmt(om) + ' / month', ox, 360);
+
+  // Autonomy Score block
+  const inc = getIncomeM();
+  const score = autoScore(inc, om);
+  const sx = 520;
+  const scoreCol = score >= 75 ? '#4caf82' : score >= 33 ? '#4a9fd4' : '#e05c5c';
+  ctx.fillStyle = scoreCol;
+  ctx.font = '500 11px "DM Mono", monospace';
+  ctx.letterSpacing = '3px';
+  ctx.fillText('AUTONOMY', sx, 300);
+  ctx.letterSpacing = '0px';
+  ctx.font = '600 40px "Georgia", serif';
+  ctx.fillStyle = scoreCol;
+  ctx.fillText(inc > 0 ? score : '—', sx, 344);
+  ctx.font = '300 14px "Georgia", serif';
+  ctx.fillStyle = scoreCol.replace(')', ',0.7)').replace('rgb', 'rgba');
+  ctx.fillText(inc > 0 ? '/ 100' : 'no income set', sx, 364);
+
+  // Tagline bottom-right
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.font = '300 13px "DM Mono", monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('fulfillmentnumber.com', W - 44, H - 32);
+  ctx.textAlign = 'left';
+
+  // Copy to clipboard
+  const origLabel = btn.textContent;
+  canvas.toBlob(blob => {
+    if (!blob) { showToast('Could not generate image.'); return; }
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      .then(() => {
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => btn.textContent = origLabel, 2200);
+      })
+      .catch(() => {
+        // Fallback: offer download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'fulfillment-number-badge.png';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Badge downloaded as PNG.');
+      });
+  }, 'image/png');
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function startOver() {
+  SECTIONS.forEach(s => { custom[s.id] = []; });
+  SECTIONS.forEach(s => s.fields.forEach(f => {
+    ev[f.id] = { e: DEF[f.id]?.e || 0, o: DEF[f.id]?.o || 0 };
+  }));
+  Object.keys(qsel).forEach(k => delete qsel[k]);
+  ctr = 0; period = 'm';
+  sessionId = null; sessionStart = null; lastLoggedIncome = null; sessionCompleted = false;
+
+  // Clear income field and sidebar income
+  const incEl = document.getElementById('incomeInput');
+  if (incEl) incEl.value = '';
+  const sbInc = document.getElementById('sb-inc');
+  if (sbInc) sbInc.textContent = '—';
+  const sbPhase = document.getElementById('sb-phase');
+  if (sbPhase) { sbPhase.className = 'sb-phase-badge none'; sbPhase.textContent = 'Not assessed'; }
+
+  // Reset progress step indicators
+  for (let i = 1; i <= 5; i++) {
+    const d = document.getElementById('dot-' + i);
+    if (d) { d.className = i === 1 ? 'dot on' : 'dot'; d.innerHTML = i; }
+  }
+  for (let i = 1; i <= 4; i++) {
+    const l = document.getElementById('ln-' + i);
+    if (l) l.className = 'line';
+  }
+  currentStep = 0;
+
+  document.getElementById('shareSection').classList.add('hidden');
+  // Reset report section
+  const rp = document.getElementById('reportSection');
+  if (rp) {
+    rp.style.display = 'none';
+    const inp = document.getElementById('reportEmail');
+    const btn = document.getElementById('reportBtn');
+    const sta = document.getElementById('reportStatus');
+    if (inp) { inp.value = ''; inp.disabled = false; }
+    if (btn) { btn.textContent = 'Send My Report'; btn.disabled = false; }
+    if (sta) { sta.textContent = ''; sta.className = 'report-status'; }
+  }
+  buildQuiz();
+  SECTIONS.forEach(buildSection);
+  // Return to start screen
+  for (let i = 1; i <= 5; i++) document.getElementById('s' + i).classList.add('hidden');
+  document.getElementById('progBar').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ═══════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════
+function showDash() {
+  document.querySelector('header')?.classList.add('hidden');
+  document.querySelector('.prog')?.classList.add('hidden');
+  document.getElementById('startScreen')?.classList.add('hidden');
+  for (let i = 1; i <= 5; i++) { const el = document.getElementById('s' + i); if (el) el.classList.add('hidden'); }
+  document.getElementById('mainFooter')?.classList.add('hidden');
+  document.getElementById('dashView').classList.remove('hidden');
+  loadDash();
+}
+
+async function loadDash() {
+  const fmtD = n => '$' + Math.round(n).toLocaleString();
+  const noData = id => { const el = document.getElementById(id); if (el) el.innerHTML = '<div class="no-data">No data yet.</div>'; };
+
+  // Wait for Firebase module to finish initialising before reading
+  // Without this, loadDash() called on page load races against the module script
+  if (window._fbReady) await window._fbReady;
+
+  // ── Load from Firestore ──
+  const fb = window._fb;
+  let comp = null, sessions = {};
+  let fbAvailable = false;
+
+  try {
+    if (fb) {
+      const [aggSnap, sessSnap] = await Promise.all([
+        fb.getDoc(fb.doc(fb.db, 'completions', 'aggregate')),
+        fb.getDocs(fb.collection(fb.db, 'sessions')),
+      ]);
+      fbAvailable = true;
+      if (aggSnap.exists()) {
+        // Firestore may return dot-notation keys as flat strings (e.g. "phases.stability")
+        // instead of nested objects. Expand them into proper nested objects.
+        const raw = aggSnap.data();
+        comp = {};
+        for (const [k, v] of Object.entries(raw)) {
+          if (k.includes('.')) {
+            const parts = k.split('.');
+            let obj = comp;
+            for (let i = 0; i < parts.length - 1; i++) {
+              if (!obj[parts[i]] || typeof obj[parts[i]] !== 'object') obj[parts[i]] = {};
+              obj = obj[parts[i]];
+            }
+            obj[parts[parts.length - 1]] = v;
+          } else {
+            comp[k] = v;
+          }
+        }
+      }
+      sessSnap.forEach(d => { sessions[d.id] = d.data(); });
+    }
+  } catch(e) {
+    console.warn('loadDash Firebase read failed, falling back to localStorage:', e);
+  }
+
+  // Only fall back to localStorage if Firebase was unreachable (not just empty)
+  if (!fbAvailable) {
+    const raw = localStorage.getItem('fn_completions');
+    comp = raw ? JSON.parse(raw) : null;
+    const rawS = localStorage.getItem('fn_sessions');
+    if (rawS) sessions = JSON.parse(rawS);
+  }
+
+  // ── Session stats ──
+  const allSessions    = Object.values(sessions);
+  const totalSessions  = allSessions.length;
+  const totalAbandoned = allSessions.filter(s => s.completed === false).length;
+  const totalAdjusted  = allSessions.filter(s => s.adjusted  === true).length;
+  const adjRate        = totalSessions > 0 ? Math.round((totalAdjusted / totalSessions) * 100) : 0;
+  const compRate       = totalSessions > 0 && comp?.count
+    ? Math.round((comp.count / totalSessions) * 100) : 0;
+
+  document.getElementById('d-sessions').textContent = totalSessions.toLocaleString();
+
+  // ── Recency KPIs — derived from sessions (available from first interaction) ──
+  const nowD    = new Date();
+  const todayKey = nowD.toISOString().slice(0, 10);
+  // Build a date→count map from session startedAt timestamps
+  const sessionsByDay = {};
+  allSessions.forEach(s => {
+    if (!s.startedAt) return;
+    const k = new Date(s.startedAt).toISOString().slice(0, 10);
+    sessionsByDay[k] = (sessionsByDay[k] || 0) + 1;
+  });
+  let sessToday = 0, sessWeek = 0, sessMonth = 0;
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(nowD); d.setDate(d.getDate() - i);
+    const k = d.toISOString().slice(0, 10);
+    const n = sessionsByDay[k] || 0;
+    if (i === 0) sessToday = n;
+    if (i < 7)  sessWeek  += n;
+    sessMonth += n;
+  }
+  document.getElementById('d-today').textContent = sessToday.toLocaleString();
+  document.getElementById('d-week').textContent  = sessWeek.toLocaleString();
+  document.getElementById('d-month').textContent = sessMonth.toLocaleString();
+
+  // ── Geography from sessions (available from first interaction) ──
+  const GEO_COLORS = ['var(--gold)','var(--ess)','var(--build)','var(--stab)','var(--auto)','#a78bfa','#fb923c','#34d399'];
+  const sessGeo = {};
+  allSessions.forEach(s => { if (s.country) sessGeo[s.country] = (sessGeo[s.country] || 0) + 1; });
+  const geoEntries = Object.entries(sessGeo).sort((a,b) => b[1]-a[1]).slice(0, 8);
+  const geoTotal   = geoEntries.reduce((s,[,n]) => s + n, 0);
+  document.getElementById('d-geo').innerHTML = geoEntries.length > 0
+    ? geoEntries.map(([country, n], idx) => {
+        const pct = geoTotal > 0 ? Math.round((n / geoTotal) * 100) : 0;
+        const col = GEO_COLORS[idx % GEO_COLORS.length];
+        return `<div class="ph-row">
+          <div class="ph-row-top">
+            <span class="ph-row-name">${country}</span>
+            <span class="ph-row-val">${n} (${pct}%)</span>
+          </div>
+          <div class="ph-bar-track"><div class="ph-bar-fill" style="background:${col};width:0" data-pct="${pct}"></div></div>
+        </div>`;
+      }).join('')
+    : '<div class="no-data">No geographic data yet.</div>';
+
+  // ── Device & browser from sessions (available from first interaction) ──
+  const DEV_COLORS = ['var(--gold)','var(--ess)','var(--build)'];
+  const BR_COLORS  = ['#a78bfa','#fb923c','#34d399','var(--auto)','var(--muted)'];
+  const sessDevices  = {}, sessBrowsers = {};
+  allSessions.forEach(s => {
+    if (s.screen)  sessDevices[s.screen]   = (sessDevices[s.screen]   || 0) + 1;
+    if (s.browser) sessBrowsers[s.browser] = (sessBrowsers[s.browser] || 0) + 1;
+  });
+  const devEntries = Object.entries(sessDevices).sort((a,b)  => b[1]-a[1]);
+  const brEntries  = Object.entries(sessBrowsers).sort((a,b) => b[1]-a[1]);
+  const devTotal   = devEntries.reduce((s,[,n]) => s + n, 0);
+  const brTotal    = brEntries.reduce((s,[,n])  => s + n, 0);
+  const devBars = devEntries.map(([dev, n], i) => {
+    const pct = devTotal > 0 ? Math.round((n / devTotal) * 100) : 0;
+    return `<div class="ph-row"><div class="ph-row-top"><span class="ph-row-name" style="text-transform:capitalize">${dev}</span><span class="ph-row-val">${n} (${pct}%)</span></div><div class="ph-bar-track"><div class="ph-bar-fill" style="background:${DEV_COLORS[i%DEV_COLORS.length]};width:0" data-pct="${pct}"></div></div></div>`;
+  }).join('');
+  const brBars = brEntries.map(([br, n], i) => {
+    const pct = brTotal > 0 ? Math.round((n / brTotal) * 100) : 0;
+    return `<div class="ph-row"><div class="ph-row-top"><span class="ph-row-name">${br}</span><span class="ph-row-val">${n} (${pct}%)</span></div><div class="ph-bar-track"><div class="ph-bar-fill" style="background:${BR_COLORS[i%BR_COLORS.length]};width:0" data-pct="${pct}"></div></div></div>`;
+  }).join('');
+  const divider = devBars && brBars ? `<div style="height:1px;background:var(--border);margin:14px 0"></div>` : '';
+  document.getElementById('d-devices').innerHTML = (devBars || brBars)
+    ? `<div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:10px">Device</div>${devBars}${divider}<div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin:10px 0">Browser</div>${brBars}`
+    : '<div class="no-data">No device data yet.</div>';
+
+  // ── Abandoned sessions card (session-based — renders even with zero completions) ──
+  const stepCounts = {1:0,2:0,3:0,4:0,5:0};
+  allSessions.filter(s => !s.completed).forEach(s => {
+    const step = Math.min(5, Math.max(1, s.lastStep || 1));
+    stepCounts[step]++;
+  });
+  const abandRateColor = totalAbandoned === 0 ? 'var(--auto)'
+    : compRate >= 60 ? 'var(--build)' : 'var(--stab)';
+  document.getElementById('d-abandoned-card').innerHTML = `
+    <div style="text-align:center;padding:8px 0 22px">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:3.5rem;font-weight:700;color:${abandRateColor};line-height:1">${totalAbandoned.toLocaleString()}</div>
+      <div style="font-size:.75rem;color:var(--dim);margin-top:5px;font-family:'DM Mono',monospace;letter-spacing:1px">sessions not completed</div>
+    </div>
+    <div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:10px">Last step reached before exit</div>
+    ${['Assessment','Housing','Food & Transport','Lifestyle & Growth','Results'].map((label, i) => {
+      const step = i + 1;
+      const n = stepCounts[step] || 0;
+      const maxS = Math.max(...Object.values(stepCounts), 1);
+      const pct = Math.round((n / maxS) * 100);
+      return `<div class="ph-row"><div class="ph-row-top"><span class="ph-row-name" style="font-size:.76rem">Step ${step} — ${label}</span><span class="ph-row-val">${n}</span></div><div class="ph-bar-track"><div class="ph-bar-fill" style="background:var(--red);opacity:.65;width:0" data-pct="${pct}"></div></div></div>`;
+    }).join('')}`;
+
+  // ── Completion rate card (session-based — renders even with zero completions) ──
+  const compRateBar = compRate;
+  const compRateColor = compRate >= 60 ? 'var(--auto)' : compRate >= 35 ? 'var(--build)' : 'var(--stab)';
+  const completionCount = comp?.count || 0;
+  document.getElementById('d-comp-rate-card').innerHTML = `
+    <div style="text-align:center;padding:8px 0 22px">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:3.5rem;font-weight:700;color:${compRateColor};line-height:1">${compRate}%</div>
+      <div style="font-size:.75rem;color:var(--dim);margin-top:5px;font-family:'DM Mono',monospace;letter-spacing:1px">of sessions completed</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-row-top">
+        <span class="ph-row-name">Completions</span>
+        <span class="ph-row-val">${completionCount.toLocaleString()}</span>
+      </div>
+      <div class="ph-bar-track"><div class="ph-bar-fill" style="background:${compRateColor};width:0" data-pct="${compRateBar}"></div></div>
+    </div>
+    <div class="ph-row" style="margin-top:10px">
+      <div class="ph-row-top">
+        <span class="ph-row-name">Abandoned</span>
+        <span class="ph-row-val">${totalAbandoned.toLocaleString()}</span>
+      </div>
+      <div class="ph-bar-track"><div class="ph-bar-fill" style="background:var(--red);opacity:.6;width:0" data-pct="${100 - compRateBar}"></div></div>
+    </div>`;
+
+  if (!comp || !comp.count || comp.count === 0) {
+    ['d-total','d-avg-e','d-avg-o','d-avg-inc','d-avg-gap','d-adj-rate','d-avg-time','d-comp-rate'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = id === 'd-total' ? '0' : (id === 'd-comp-rate' ? '0%' : '—');
+    });
+    ['d-phase-dist','d-quiz-breakdown',
+     'd-avg-cats','d-ess-opt-ratio','d-custom-items',
+     'd-talking-pts'].forEach(noData);
+    document.getElementById('d-adj-rate').textContent = adjRate + '%';
+    // Animate session-based bars that were already rendered above
+    setTimeout(() => {
+      document.querySelectorAll('[data-pct]').forEach(b => {
+        b.style.transition = 'width 1s ease';
+        b.style.width = b.dataset.pct + '%';
+      });
+    }, 100);
+    return;
+  }
+
+  // ── Derived averages ──
+  const avgE   = Math.round(comp.totalEss / comp.count);
+  const avgO   = Math.round(comp.totalOpt / comp.count);
+  const avgGap = avgO - avgE;
+  const avgInc = comp.incCount > 0 ? Math.round(comp.totalInc / comp.incCount) : 0;
+  const avgTime= comp.totalTime && comp.count > 0 ? Math.round(comp.totalTime / comp.count) : 0;
+  const avgTimeFmt = avgTime > 0
+    ? (avgTime >= 60 ? Math.floor(avgTime/60) + 'm ' + (avgTime%60) + 's' : avgTime + 's')
+    : '—';
+
+  document.getElementById('d-total').textContent    = comp.count.toLocaleString();
+  document.getElementById('d-comp-rate').textContent = compRate + '%';
+  document.getElementById('d-avg-e').textContent    = fmtD(avgE);
+  document.getElementById('d-avg-o').textContent    = fmtD(avgO);
+  document.getElementById('d-avg-inc').textContent  = comp.incCount > 0 ? fmtD(avgInc) : '—';
+  document.getElementById('d-avg-gap').textContent  = fmtD(avgGap);
+  document.getElementById('d-adj-rate').textContent = adjRate + '%';
+  document.getElementById('d-avg-time').textContent = avgTimeFmt;
+
+  // ── Phase distribution ──
+  const phases     = comp.phases || {};
+  const totalPhase = (phases.stability||0) + (phases.build||0) + (phases.autonomy||0);
+  const phaseDefs  = [
+    { k:'stability', label:'Stability Phase', cls:'pf-stab'  },
+    { k:'build',     label:'Build Phase',     cls:'pf-build' },
+    { k:'autonomy',  label:'Autonomy Phase',  cls:'pf-auto'  },
+  ];
+  document.getElementById('d-phase-dist').innerHTML = totalPhase > 0
+    ? phaseDefs.map(p => {
+        const n = phases[p.k] || 0;
+        const pct = Math.round((n / totalPhase) * 100);
+        return `<div class="ph-row">
+          <div class="ph-row-top">
+            <span class="ph-row-name">${p.label}</span>
+            <span class="ph-row-val">${n} (${pct}%)</span>
+          </div>
+          <div class="ph-bar-track"><div class="ph-bar-fill ${p.cls}" style="width:0" data-pct="${pct}"></div></div>
+        </div>`;
+      }).join('')
+    : '<div class="no-data">No completions with income yet.</div>';
+
+  // ── Key sanitiser (must match write side) ──
+  const fk = s => s
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')
+    .toLowerCase() || 'unknown';
+
+  // ── Quiz response breakdown ──
+  const quizData  = comp.quiz || {};
+  const QUIZ_COLORS = ['var(--gold)','var(--ess)','var(--auto)','#a78bfa'];
+  const quizHtml = QUIZ.map(q => {
+    const qResponses = quizData[fk(q.id)] || {};
+    const qTotal = Object.values(qResponses).reduce((s, n) => s + (typeof n === 'number' ? n : 0), 0);
+    if (qTotal === 0) return '';
+    const bars = q.opts.map((opt, i) => {
+      const n = qResponses[i] || 0;
+      const pct = qTotal > 0 ? Math.round((n / qTotal) * 100) : 0;
+      const col = QUIZ_COLORS[i % QUIZ_COLORS.length];
+      return `<div class="ph-row" style="margin-bottom:7px">
+        <div class="ph-row-top">
+          <span class="ph-row-name" style="font-size:.75rem">${opt.label}</span>
+          <span class="ph-row-val">${n} (${pct}%)</span>
+        </div>
+        <div class="ph-bar-track"><div class="ph-bar-fill" style="background:${col};width:0" data-pct="${pct}"></div></div>
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:18px">
+      <div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:10px">${q.text}</div>
+      ${bars}
+    </div>`;
+  }).filter(Boolean).join('');
+  document.getElementById('d-quiz-breakdown').innerHTML = quizHtml ||
+    '<div class="no-data">No quiz response data yet.</div>';
+
+  // ── Avg Optimal by category ──
+  // Keys in Firestore are sanitised; use catNames map for display labels
+  const cats      = comp.cats     || {};
+  const catNames  = comp.catNames || {};
+  const catEntries = Object.entries(cats)
+    .filter(([,d]) => d && typeof d.o === 'number' && d.n > 0)
+    .sort((a,b) => (b[1].o/b[1].n) - (a[1].o/a[1].n)).slice(0,8);
+  const maxCatO = Math.max(...catEntries.map(([,d]) => d.o/d.n), 1);
+  document.getElementById('d-avg-cats').innerHTML = catEntries.length > 0
+    ? catEntries.map(([key, d]) => {
+        const avg   = Math.round(d.o / d.n);
+        const pct   = Math.round((avg / maxCatO) * 100);
+        const label = catNames[key] || key.replace(/_/g,' ');
+        return `<div class="ph-row">
+          <div class="ph-row-top">
+            <span class="ph-row-name">${label}</span>
+            <span class="ph-row-val">${fmtD(avg)}<span style="font-size:.7rem;color:var(--dim)">/mo</span></span>
+          </div>
+          <div class="ph-bar-track"><div class="ph-bar-fill" style="background:var(--gold);width:0" data-pct="${pct}"></div></div>
+        </div>`;
+      }).join('')
+    : '<div class="no-data">No data.</div>';
+
+  // ── Essential vs Optimal ratio by category ──
+  const RATIO_COLORS = ['var(--ess)','var(--auto)','#a78bfa','#fb923c','#34d399','var(--gold)','var(--stab)','var(--build)'];
+  const ratioEntries = Object.entries(cats)
+    .filter(([,d]) => d && d.n > 0 && d.o > 0)
+    .map(([key, d]) => ({ key, label: catNames[key] || key.replace(/_/g,' '), ratio: Math.round((d.e / d.o) * 100) }))
+    .sort((a,b) => b.ratio - a.ratio).slice(0,8);
+  document.getElementById('d-ess-opt-ratio').innerHTML = ratioEntries.length > 0
+    ? `<div style="font-size:.72rem;color:var(--dim);margin-bottom:12px;line-height:1.5">100% = fully non-negotiable. Low % = aspirational / lifestyle allocation.</div>` +
+      ratioEntries.map(({label, ratio}, i) => {
+        const col = RATIO_COLORS[i % RATIO_COLORS.length];
+        return `<div class="ph-row">
+          <div class="ph-row-top">
+            <span class="ph-row-name">${label}</span>
+            <span class="ph-row-val">${ratio}% essential</span>
+          </div>
+          <div class="ph-bar-track"><div class="ph-bar-fill" style="background:${col};width:0" data-pct="${ratio}"></div></div>
+        </div>`;
+      }).join('')
+    : '<div class="no-data">No data.</div>';
+
+  // ── Custom items ──
+  const customItemNames = comp.customItemNames || {};
+  const topCustom = Object.entries(comp.customItems || {})
+    .filter(([,v]) => typeof v === 'number')
+    .sort((a,b) => b[1]-a[1]).slice(0,8);
+  document.getElementById('d-custom-items').innerHTML = topCustom.length > 0
+    ? topCustom.map(([key, cnt]) => {
+        const name = customItemNames[key] || key.replace(/_/g,' ');
+        return `<div class="custom-tag-item">
+          <span class="custom-tag-name">${name.charAt(0).toUpperCase() + name.slice(1)}</span>
+          <span class="custom-tag-count">×${cnt}</span>
+        </div>`;
+      }).join('')
+    : '<div class="no-data">No custom items recorded yet.</div>';
+
+  // ── Talking points ──
+  const stabPct  = totalPhase > 0 ? Math.round(((phases.stability||0)/totalPhase)*100) : 0;
+  const buildPct = totalPhase > 0 ? Math.round(((phases.build||0)/totalPhase)*100) : 0;
+  const autoPct  = totalPhase > 0 ? Math.round(((phases.autonomy||0)/totalPhase)*100) : 0;
+  const topGeo   = geoEntries[0] ? geoEntries[0][0] : null;
+  const topDev   = devEntries[0] ? devEntries[0][0] : null;
+  const topRatio = ratioEntries[0] || null;
+  const lowRatio = ratioEntries[ratioEntries.length - 1] || null;
+  // Top quiz responses
+  const quizHighlights = QUIZ.map(q => {
+    const qResponses = (comp.quiz || {})[fk(q.id)] || {};
+    const best = Object.entries(qResponses).filter(([,v]) => typeof v === 'number').sort((a,b) => b[1]-a[1])[0];
+    if (!best) return null;
+    const optLabel = q.opts[best[0]]?.label;
+    const qTotal = Object.values(qResponses).filter(v => typeof v === 'number').reduce((s,n)=>s+n,0);
+    const pct = qTotal > 0 ? Math.round((best[1]/qTotal)*100) : 0;
+    return optLabel ? `<strong>${pct}%</strong> selected "${optLabel}" for ${q.text.toLowerCase().replace(':','')}` : null;
+  }).filter(Boolean);
+
+  const tps = [
+    `<strong>${comp.count.toLocaleString()} people</strong> have calculated their Fulfillment Number. Completion rate: <strong>${compRate}%</strong>.${totalAbandoned > 0 ? ` <strong>${totalAbandoned}</strong> session${totalAbandoned !== 1 ? 's' : ''} started but did not complete.` : ''}`,
+    `The average Essential Allocation Requirement is <strong>${fmtD(avgE)}/month</strong>. The average Optimal is <strong>${fmtD(avgO)}/month</strong>. The average Fulfillment Gap is <strong>${fmtD(avgGap)}/month</strong>.`,
+    comp.incCount > 0 ? `Average reported net income is <strong>${fmtD(avgInc)}/month</strong>. ${avgInc < avgE ? 'Average income falls below the Essential threshold — the majority of this audience is in the Stability Phase.' : avgInc < avgO ? 'Average income covers Essential obligations but falls short of Optimal — the majority of this audience is in the Build Phase.' : 'Average income meets or exceeds the Optimal threshold across this audience.'}` : '',
+    totalPhase > 0 ? `Phase breakdown: <strong>${stabPct}%</strong> Stability · <strong>${buildPct}%</strong> Build · <strong>${autoPct}%</strong> Autonomy.` : '',
+    adjRate > 0 ? `<strong>${adjRate}%</strong> of sessions went back to adjust their allocations — indicating a thoughtful, engaged audience.` : '',
+    avgTime > 0 ? `Average time to complete: <strong>${avgTimeFmt}</strong>.` : '',
+    quizHighlights.length > 0 ? `Audience profile: ${quizHighlights.join('. ')}.` : '',
+    topRatio ? `Most non-negotiable category: <strong>${topRatio.label}</strong> (${topRatio.ratio}% of Optimal is Essential spend).` : '',
+    lowRatio && lowRatio.label !== topRatio?.label ? `Most aspirational category: <strong>${lowRatio.label}</strong> (${lowRatio.ratio}% of Optimal is Essential) — this is where lifestyle ambition lives.` : '',
+    topGeo ? `Largest audience segment by locale: <strong>${topGeo}</strong>.` : '',
+    topDev ? `Primary access device: <strong>${topDev}</strong>.` : '',
+    topCustom.length > 0 ? `Most frequently added custom allocations: <strong>${topCustom.slice(0,3).map(([k]) => customItemNames[k] || k.replace(/_/g,' ')).join(', ')}</strong>.` : '',
+  ].filter(Boolean);
+
+  document.getElementById('d-talking-pts').innerHTML = tps.map(tp =>
+    `<div style="padding:12px 16px;background:var(--s2);border-radius:var(--rs);font-size:.84rem;color:var(--muted);line-height:1.65;border-left:2px solid var(--gold);">${tp}</div>`
+  ).join('');
+
+  // ── Animate all bars ──
+  setTimeout(() => {
+    document.querySelectorAll('[data-pct]').forEach(b => {
+      b.style.transition = 'width 1s ease';
+      b.style.width = b.dataset.pct + '%';
+    });
+  }, 100);
+}
+
+// ── BOOT ──
+init();
+</script>
+</body>
+</html>
